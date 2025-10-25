@@ -20,10 +20,10 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { type InvoiceFormData, type InvoiceWithId, invoiceFormSchema, type Client } from '@/lib/types';
+import { type InvoiceFormData, type InvoiceWithId, invoiceFormSchema, type Client, type CompanyProfile } from '@/lib/types';
 import { addInvoice, updateInvoice } from '@/lib/firebase/invoices';
-import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
 import { cn, formatCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
 import {
@@ -52,6 +52,12 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
     [user, firestore]
   );
   const { data: clients } = useCollection<Client>(clientsCollection);
+
+  const companyProfileRef = useMemoFirebase(
+    () => (user && firestore ? doc(firestore, 'users', user.uid, 'companyProfile', 'profile') : null),
+    [user, firestore]
+  );
+  const { data: companyProfile } = useDoc<CompanyProfile>(companyProfileRef);
 
   const methods = useForm<InvoiceFormData>({
     resolver: zodResolver(invoiceFormSchema),
@@ -340,9 +346,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                     </form>
                 </Form>
             </Card>
-            <div>
-                <InvoicePreview generatedHtml={generatedHtml} />
-            </div>
+            <InvoicePreview generatedHtml={generatedHtml} companyProfile={companyProfile} />
         </div>
     </FormProvider>
   );

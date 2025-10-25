@@ -1,19 +1,22 @@
+
 'use client';
 
 import { useFormContext } from 'react-hook-form';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Printer, Download } from 'lucide-react';
+import { Printer, Download, Building } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn, formatCurrency } from '@/lib/utils';
-import type { InvoiceFormData } from '@/lib/types';
+import type { InvoiceFormData, CompanyProfile } from '@/lib/types';
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 
 type InvoicePreviewProps = {
   generatedHtml: string | null;
+  companyProfile: CompanyProfile | null;
 };
 
-export default function InvoicePreview({ generatedHtml }: InvoicePreviewProps) {
+export default function InvoicePreview({ generatedHtml, companyProfile }: InvoicePreviewProps) {
   const { watch } = useFormContext<InvoiceFormData>();
   const data = watch();
 
@@ -39,9 +42,17 @@ export default function InvoicePreview({ generatedHtml }: InvoicePreviewProps) {
   const DefaultPreview = () => (
     <CardContent className="p-6 sm:p-8">
       <div className="grid gap-4 md:grid-cols-2 mb-8">
-        <div>
-          <h2 className="text-2xl font-bold text-primary">Your Company</h2>
-          <p className="text-muted-foreground whitespace-pre-wrap">Your Address</p>
+        <div className="flex items-start gap-4">
+            {companyProfile?.logoUrl ? (
+                <Avatar className="h-20 w-20">
+                    <AvatarImage src={companyProfile.logoUrl} alt={companyProfile.companyName} />
+                    <AvatarFallback><Building className="h-8 w-8" /></AvatarFallback>
+                </Avatar>
+            ) : null}
+            <div>
+              <h2 className="text-2xl font-bold text-primary">{companyProfile?.companyName || 'Your Company'}</h2>
+              <p className="text-muted-foreground whitespace-pre-wrap">{companyProfile?.address || 'Your Address'}</p>
+            </div>
         </div>
         <div className="text-right">
           <h1 className="text-3xl font-bold">INVOICE</h1>
@@ -100,7 +111,7 @@ export default function InvoicePreview({ generatedHtml }: InvoicePreviewProps) {
   );
 
   return (
-    <Card className="sticky top-24">
+    <Card>
       <CardHeader className="flex-row items-center justify-between no-print">
         <CardTitle>Preview</CardTitle>
         <div className="flex gap-2">
