@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  getFirestore,
   collection,
   doc,
   addDoc,
@@ -10,7 +9,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { initializeFirebase } from '@/firebase';
+import { initializeFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import type { ClientFormData } from '@/lib/types';
 
 const { firestore, auth } = initializeFirebase();
@@ -21,23 +20,43 @@ function getClientsCollection() {
   return collection(firestore, 'users', user.uid, 'clients');
 }
 
-export async function addClient(clientData: ClientFormData) {
+export function addClient(clientData: ClientFormData) {
   const clientsCollection = getClientsCollection();
-  return await addDoc(clientsCollection, {
+  addDoc(clientsCollection, {
     ...clientData,
     createdAt: serverTimestamp(),
+  }).catch(error => {
+    const permissionError = new FirestorePermissionError({
+      path: clientsCollection.path,
+      operation: 'create',
+      requestResourceData: clientData,
+    });
+    errorEmitter.emit('permission-error', permissionError);
   });
 }
 
-export async function updateClient(clientId: string, clientData: Partial<ClientFormData>) {
+export function updateClient(clientId: string, clientData: Partial<ClientFormData>) {
   const clientDoc = doc(getClientsCollection(), clientId);
-  return await updateDoc(clientDoc, {
+  updateDoc(clientDoc, {
     ...clientData,
     updatedAt: serverTimestamp(),
+  }).catch(error => {
+    const permissionError = new FirestorePermissionError({
+      path: clientDoc.path,
+      operation: 'update',
+      requestResourceData: clientData,
+    });
+    errorEmitter.emit('permission-error', permissionError);
   });
 }
 
-export async function deleteClient(clientId: string) {
+export function deleteClient(clientId: string) {
   const clientDoc = doc(getClientsCollection(), clientId);
-  return await deleteDoc(clientDoc);
+  deleteDoc(clientDoc).catch(error => {
+    const permissionError = new FirestorePermissionError({
+      path: clientDoc.path,
+      operation: 'delete',
+    });
+    errorEmitter.emit('permission-error', permissionError);
+  });
 }

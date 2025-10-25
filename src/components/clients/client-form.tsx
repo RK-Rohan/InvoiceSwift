@@ -57,24 +57,15 @@ export default function ClientForm({ isOpen, onClose, client }: ClientFormProps)
     }
   }, [client, form, isOpen]);
 
-  const onSubmit = async (values: ClientFormData) => {
-    try {
-      if (client) {
-        await updateClient(client.id, values);
-        toast({ title: 'Client updated successfully' });
-      } else {
-        await addClient(values);
-        toast({ title: 'Client added successfully' });
-      }
-      onClose();
-    } catch (error) {
-      console.error(error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'An error occurred. Please try again.',
-      });
+  const onSubmit = (values: ClientFormData) => {
+    if (client) {
+      updateClient(client.id, values);
+      toast({ title: 'Client updated successfully' });
+    } else {
+      addClient(values);
+      toast({ title: 'Client added successfully' });
     }
+    onClose();
   };
 
   return (

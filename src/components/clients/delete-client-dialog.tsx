@@ -27,19 +27,10 @@ export default function DeleteClientDialog({
 }: DeleteClientDialogProps) {
   const { toast } = useToast();
 
-  const handleDelete = async () => {
-    try {
-      await deleteClient(client.id);
-      toast({ title: 'Client deleted successfully' });
-      onClose();
-    } catch (error) {
-      console.error(error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to delete client. Please try again.',
-      });
-    }
+  const handleDelete = () => {
+    deleteClient(client.id);
+    toast({ title: 'Client deleted successfully' });
+    onClose();
   };
 
   return (
