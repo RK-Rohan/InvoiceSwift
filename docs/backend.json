@@ -45,7 +45,11 @@
         },
         "clientId": {
           "type": "string",
-          "description": "Reference to Client. (Relationship: Client 1:N Invoice)"
+          "description": "Reference to Client."
+        },
+        "clientName": {
+          "type": "string",
+          "description": "Name of the client at the time of invoice creation."
         },
         "invoiceNumber": {
           "type": "string",
@@ -54,72 +58,43 @@
         "issueDate": {
           "type": "string",
           "description": "Date the invoice was issued.",
-          "format": "date-time"
+          "format": "date"
         },
         "dueDate": {
           "type": "string",
           "description": "Date the invoice is due.",
-          "format": "date-time"
+          "format": "date"
         },
         "totalAmount": {
           "type": "number",
           "description": "Total amount due on the invoice."
         },
-        "lateFeeWarning": {
-          "type": "string",
-          "description": "Late fee warning message for the invoice."
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": { "type": "string" },
+              "quantity": { "type": "number" },
+              "unitPrice": { "type": "number" }
+            },
+            "required": ["description", "quantity", "unitPrice"]
+          }
         },
-        "termsAndConditions": {
+        "notes": {
           "type": "string",
-          "description": "Terms and conditions that client agreed to."
+          "description": "Additional notes or terms."
         }
       },
       "required": [
         "id",
         "clientId",
+        "clientName",
         "invoiceNumber",
         "issueDate",
         "dueDate",
-        "totalAmount"
-      ]
-    },
-    "InvoiceItem": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "InvoiceItem",
-      "type": "object",
-      "description": "Represents a single item on an invoice.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the InvoiceItem entity."
-        },
-        "invoiceId": {
-          "type": "string",
-          "description": "Reference to Invoice. (Relationship: Invoice 1:N InvoiceItem)"
-        },
-        "description": {
-          "type": "string",
-          "description": "Description of the item."
-        },
-        "quantity": {
-          "type": "number",
-          "description": "Quantity of the item."
-        },
-        "unitPrice": {
-          "type": "number",
-          "description": "Price per unit of the item."
-        },
-        "taxRate": {
-          "type": "number",
-          "description": "Tax rate applicable to the item."
-        }
-      },
-      "required": [
-        "id",
-        "invoiceId",
-        "description",
-        "quantity",
-        "unitPrice"
+        "totalAmount",
+        "items"
       ]
     },
     "CompanyProfile": {
@@ -147,8 +122,7 @@
         },
         "logoUrl": {
           "type": "string",
-          "format": "uri",
-          "description": "URL of the company logo."
+          "description": "Data URI of the company logo."
         }
       },
       "required": [
@@ -186,53 +160,21 @@
         }
       },
       {
-        "path": "/users/{userId}/clients/{clientId}/invoices/{invoiceId}",
+        "path": "/users/{userId}/invoices/{invoiceId}",
         "definition": {
           "entityName": "Invoice",
           "schema": {
             "$ref": "#/backend/entities/Invoice"
           },
-          "description": "Stores invoice data for a specific client. Path-based ownership ensures that only the user with ID {userId} can access these invoices.",
+          "description": "Stores invoice data for a specific user. Path-based ownership ensures that only the user with ID {userId} can access these invoices.",
           "params": [
             {
               "name": "userId",
               "description": "The unique identifier of the user."
             },
             {
-              "name": "clientId",
-              "description": "The unique identifier of the client."
-            },
-            {
               "name": "invoiceId",
               "description": "The unique identifier of the invoice."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/users/{userId}/clients/{clientId}/invoices/{invoiceId}/invoiceItems/{invoiceItemId}",
-        "definition": {
-          "entityName": "InvoiceItem",
-          "schema": {
-            "$ref": "#/backend/entities/InvoiceItem"
-          },
-          "description": "Stores individual items for a specific invoice. Path-based ownership ensures that only the user with ID {userId} can access these invoice items.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            },
-            {
-              "name": "clientId",
-              "description": "The unique identifier of the client."
-            },
-            {
-              "name": "invoiceId",
-              "description": "The unique identifier of the invoice."
-            },
-            {
-              "name": "invoiceItemId",
-              "description": "The unique identifier of the invoice item."
             }
           ]
         }
@@ -254,6 +196,6 @@
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to securely manage clients, invoices, and invoice items for the InvoiceSwift application, emphasizing authorization independence, clarity, and scalability. It leverages path-based ownership and denormalization to simplify security rules and ensure data integrity.\n\n**Authorization Independence:**\n\n*   Invoices and InvoiceItems are stored as subcollections of clients (`/users/{userId}/clients/{clientId}/invoices/{invoiceId}` and `/users/{userId}/clients/{clientId}/invoices/{invoiceId}/invoiceItems/{invoiceItemId}`). This structure ensures that access to invoices and invoice items is implicitly controlled by the user's ownership of the client document.\n*   There is no `get()` call in the rules, and authorization context is self-contained within each document or derived from the path.\n\n**Structural Segregation:**\n\n*   Client, Invoice and InvoiceItem data is clearly segregated into separate collections, each with a homogeneous security posture.\n\n**Access Modeling:**\n\n*   Path-Based Ownership: The `/users/{userId}/clients/{clientId}` structure establishes clear ownership. Only the authenticated user (`request.auth.uid == userId`) can access clients under their user ID. This pattern extends to invoices and invoice items.\n\n**QAPs (Rules are not Filters):**\n\nThe structure supports secure `list` operations:\n\n*   Listing clients under `/users/{userId}/clients` is secure because only the authenticated user can access this collection.\n*   Listing invoices under `/users/{userId}/clients/{clientId}/invoices` is secure because access is restricted to the owner of the client document (`userId`).\n*   Listing invoice items under `/users/{userId}/clients/{clientId}/invoices/{invoiceId}/invoiceItems` is secure because access is restricted to the owner of the client document (`userId`).\n\n**Invariants:**\n\n*   Ownership: The path-based ownership model ensures that only the authenticated user can create, read, update, or delete clients and their associated data.\n*   Timestamps: While not explicitly included in the schema, timestamp fields (e.g., `createdAt`, `updatedAt`) can be added to the entities and managed by the application, with security rules enforcing their integrity (e.g., `allow create: if request.resource.data.createdAt == request.time;`).\n\nThis structure ensures secure and scalable access to invoice data while adhering to the core design principles of authorization independence, clarity, and QAPs."
+    "reasoning": "The Firestore structure is designed to securely manage clients and invoices for the InvoiceSwift application. Invoices are now stored in a top-level collection per user to simplify queries for listing all invoices, while clients are maintained in a separate collection. This improves query efficiency and maintains clear ownership via path-based security rules."
   }
 }

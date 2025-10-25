@@ -18,19 +18,31 @@ export const clientSchema = clientFormSchema.extend({
   id: z.string(),
 });
 
+const dateOrStringSchema = z.union([z.date(), z.string()]).transform((val) => {
+    if (typeof val === 'string') return new Date(val);
+    return val;
+});
 
-export const invoiceSchema = z.object({
-  from_name: z.string().min(1, 'Your name is required.'),
-  from_address: z.string().min(1, 'Your address is required.'),
-  client_id: z.string().optional(),
-  client_name: z.string().min(1, "Client's name is required."),
-  client_address: z.string().min(1, "Client's address is required."),
-  invoice_number: z.string().min(1, 'Invoice number is required.'),
-  issue_date: z.date(),
-  due_date: z.date(),
-  items: z.array(lineItemSchema).min(1, 'At least one item is required.'),
+export const invoiceFormSchema = z.object({
+  clientId: z.string().min(1, 'Client is required.'),
+  clientName: z.string(),
+  invoiceNumber: z.string().min(1, 'Invoice number is required.'),
+  issueDate: dateOrStringSchema,
+  dueDate: dateOrStringSchema,
+  items: z.array(z.object({
+    description: z.string().min(1, 'Item description is required.'),
+    quantity: z.coerce.number().min(1, 'Quantity must be at least 1.'),
+    unitPrice: z.coerce.number().min(0, 'Unit price must be non-negative.'),
+  })).min(1, 'At least one item is required.'),
   notes: z.string().optional(),
-  tax_rate: z.coerce.number().min(0).max(100).optional().default(0),
+});
+
+export const invoiceSchema = invoiceFormSchema.extend({
+  totalAmount: z.number(),
+});
+
+export const invoiceWithIdSchema = invoiceSchema.extend({
+  id: z.string(),
 });
 
 export const customizationSchema = z.object({
@@ -51,6 +63,8 @@ export const companyProfileSchema = z.object({
 export type LineItem = z.infer<typeof lineItemSchema>;
 export type Client = z.infer<typeof clientSchema>;
 export type ClientFormData = z.infer<typeof clientFormSchema>;
+export type InvoiceFormData = z.infer<typeof invoiceFormSchema>;
 export type Invoice = z.infer<typeof invoiceSchema>;
+export type InvoiceWithId = z.infer<typeof invoiceWithIdSchema>;
 export type CustomizationData = z.infer<typeof customizationSchema>;
 export type CompanyProfile = z.infer<typeof companyProfileSchema>;

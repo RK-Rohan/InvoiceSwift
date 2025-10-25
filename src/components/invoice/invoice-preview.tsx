@@ -7,14 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Printer, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn, formatCurrency } from '@/lib/utils';
-import type { Invoice } from '@/lib/types';
+import type { InvoiceFormData } from '@/lib/types';
 
 type InvoicePreviewProps = {
   generatedHtml: string | null;
 };
 
 export default function InvoicePreview({ generatedHtml }: InvoicePreviewProps) {
-  const { watch } = useFormContext<Invoice>();
+  const { watch } = useFormContext<InvoiceFormData>();
   const data = watch();
 
   const handlePrint = () => {
@@ -27,38 +27,35 @@ export default function InvoicePreview({ generatedHtml }: InvoicePreviewProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `invoice-${data.invoice_number}.html`;
+    a.download = `invoice-${data.invoiceNumber}.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
-  const subtotal = data.items.reduce((acc, item) => acc + item.quantity * item.price, 0);
-  const taxAmount = subtotal * ((data.tax_rate || 0) / 100);
-  const total = subtotal + taxAmount;
+  const subtotal = data.items.reduce((acc, item) => acc + (item.quantity || 0) * (item.unitPrice || 0), 0);
 
   const DefaultPreview = () => (
     <CardContent className="p-6 sm:p-8">
       <div className="grid gap-4 md:grid-cols-2 mb-8">
         <div>
-          <h2 className="text-2xl font-bold text-primary">{data.from_name}</h2>
-          <p className="text-muted-foreground whitespace-pre-wrap">{data.from_address}</p>
+          <h2 className="text-2xl font-bold text-primary">Your Company</h2>
+          <p className="text-muted-foreground whitespace-pre-wrap">Your Address</p>
         </div>
         <div className="text-right">
           <h1 className="text-3xl font-bold">INVOICE</h1>
-          <p className="text-muted-foreground"># {data.invoice_number}</p>
+          <p className="text-muted-foreground"># {data.invoiceNumber}</p>
         </div>
       </div>
       <div className="grid gap-4 md:grid-cols-2 mb-8">
         <div>
           <h3 className="font-semibold mb-1">Bill To</h3>
-          <p className="font-medium">{data.client_name}</p>
-          <p className="text-muted-foreground whitespace-pre-wrap">{data.client_address}</p>
+          <p className="font-medium">{data.clientName}</p>
         </div>
         <div className="text-right">
-          <p><span className="font-semibold">Issue Date:</span> {format(data.issue_date, 'PPP')}</p>
-          <p><span className="font-semibold">Due Date:</span> {format(data.due_date, 'PPP')}</p>
+          <p><span className="font-semibold">Issue Date:</span> {data.issueDate ? format(new Date(data.issueDate), 'PPP') : ''}</p>
+          <p><span className="font-semibold">Due Date:</span> {data.dueDate ? format(new Date(data.dueDate), 'PPP') : ''}</p>
         </div>
       </div>
       <Table>
@@ -71,12 +68,12 @@ export default function InvoicePreview({ generatedHtml }: InvoicePreviewProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.items.map((item) => (
-            <TableRow key={item.id}>
+          {data.items.map((item, index) => (
+            <TableRow key={index}>
               <TableCell className="font-medium">{item.description}</TableCell>
               <TableCell className="text-center">{item.quantity}</TableCell>
-              <TableCell className="text-right">{formatCurrency(item.price)}</TableCell>
-              <TableCell className="text-right">{formatCurrency(item.quantity * item.price)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(item.unitPrice || 0)}</TableCell>
+              <TableCell className="text-right">{formatCurrency((item.quantity || 0) * (item.unitPrice || 0))}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -87,13 +84,9 @@ export default function InvoicePreview({ generatedHtml }: InvoicePreviewProps) {
             <span>Subtotal</span>
             <span>{formatCurrency(subtotal)}</span>
           </div>
-          <div className="flex justify-between">
-            <span>Tax ({data.tax_rate || 0}%)</span>
-            <span>{formatCurrency(taxAmount)}</span>
-          </div>
           <div className="flex justify-between font-bold text-lg border-t pt-2">
             <span>Total</span>
-            <span>{formatCurrency(total)}</span>
+            <span>{formatCurrency(subtotal)}</span>
           </div>
         </div>
       </div>
