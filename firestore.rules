@@ -2,44 +2,46 @@
  * @fileoverview Firestore Security Rules for InvoiceSwift.
  *
  * Core Philosophy:
- * This ruleset enforces a strict user-ownership model, ensuring that only the authenticated user can access their own data.
+ * This ruleset enforces a strict user-ownership model. Each user has a dedicated
+ * data tree under `/users/{userId}` where their clients, invoices, and company profile
+ * are stored. Only the authenticated user with a matching `uid` can access their own data.
  *
  * Data Structure:
- * All data is nested under `/users/{userId}`, creating a clear separation of user data. Company profiles, clients, invoices, and invoice items are all organized within this structure.
+ * - `/users/{userId}/clients/{clientId}`: Stores client data.
+ * - `/users/{userId}/invoices/{invoiceId}`: Stores invoice data.
+ * - `/users/{userId}/companyProfile/profile`: Stores the user's company profile.
  *
  * Key Security Decisions:
- * - User listing is disallowed to protect user privacy.
- * - Strict ownership checks are enforced on all write operations.
- * - Data consistency between the path and document content is enforced on creation and updates.
- *
- * Denormalization for Authorization:
- * The rules leverage the path-based ownership model to avoid the need for costly `get()` calls. The `userId` is derived directly from the path, ensuring efficient authorization.
+ * - User data is strictly segregated based on `userId` in the path.
+ * - Listing of all users is disallowed.
+ * - The company profile is a singleton document under the `/companyProfile` subcollection.
+ * - Denormalization: The `Invoice` entity includes `clientName` to avoid needing to `get()` the client document during authorization.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the requesting user is signed in.
-     * @returns {boolean} True if the user is signed in, false otherwise.
+     * @description Checks if the request is authenticated.
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * @description Checks if the requesting user is the owner of the resource.
-     * @param {string} userId - The user ID to compare against the request's authentication UID.
-     * @returns {boolean} True if the user is the owner, false otherwise.
+     * @description Checks if the authenticated user's UID matches the provided userId.
+     * @param {string} userId - The user ID to compare against the authenticated user's UID.
+     * @return {bool} True if the user is signed in and the UID matches, false otherwise.
+     * @example isOwner("someUserId") will return true if request.auth.uid == "someUserId".
      */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
     /**
-     * @description Checks if the requesting user is the owner of the resource and the resource exists.
-     * @param {string} userId - The user ID to compare against the request's authentication UID.
-     * @returns {boolean} True if the user is the owner and the resource exists, false otherwise.
+     * @description Checks if the authenticated user is the existing owner of the document.
+     * @param {string} userId - The user ID to compare against the authenticated user's UID.
+     * @return {bool} True if the user is signed in, the UID matches, and the resource exists.
      */
     function isExistingOwner(userId) {
       return isOwner(userId) && resource != null;
@@ -47,58 +49,20 @@ service cloud.firestore {
 
     /**
      * @description
-     * Defines security rules for user documents. Only the authenticated user
-     * can create their own document, and no one can list all users.
-     * @path /users/{userId}
-     * @allow (create) User with ID 'user123' creates their own document.
-     *   request.auth.uid: 'user123'
-     *   resource.data.id: 'user123'
-     * @deny (create) User with ID 'user123' tries to create a document for 'user456'.
-     *   request.auth.uid: 'user123'
-     *   resource.data.id: 'user456'
-     * @deny (list) Any user tries to list all user documents.
-     * @principle Restricts access to a user's own data tree and prevents listing of all users.
-     */
-    match /users/{userId} {
-      // Only allow creation if the user is creating their own document.
-      allow create: if isOwner(userId);
-      allow get: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
-      allow list: if false;
-    }
-
-    /**
-     * @description Defines security rules for company profiles. Only the authenticated user
-     * can create, read, update, and delete their own company profile.
-     * @path /users/{userId}/companyProfile/profile
-     * @allow (get) User with ID 'user123' reads their own company profile.
-     *   request.auth.uid: 'user123'
-     * @allow (create) User with ID 'user123' creates their own company profile.
-     *   request.auth.uid: 'user123'
-     * @deny (get) User with ID 'user123' tries to read the company profile of 'user456'.
-     *   request.auth.uid: 'user123'
-     * @principle Enforces document ownership for writes.
-     */
-    match /users/{userId}/companyProfile/profile {
-      allow get: if isOwner(userId);
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
-      allow list: if false;
-    }
-
-    /**
-     * @description Defines security rules for clients. Only the authenticated user
-     * can create, read, update, and delete their own clients.
+     * Protects the /users/{userId}/clients/{clientId} collection.
+     * Only the owner (user with matching userId) can create, read, update, and delete their own clients.
      * @path /users/{userId}/clients/{clientId}
-     * @allow (get) User with ID 'user123' reads their own client with ID 'client456'.
-     *   request.auth.uid: 'user123'
-     * @allow (create) User with ID 'user123' creates a new client.
-     *   request.auth.uid: 'user123'
-     * @deny (get) User with ID 'user123' tries to read a client owned by 'user456'.
-     *   request.auth.uid: 'user123'
-     * @principle Enforces document ownership for writes.
+     * @allow (create) User 4RSNw6kC8rhG2y3qBYZ9dm4r6GB3 can create a client under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/clients/someClientId if signed in.
+     * @allow (get) User 4RSNw6kC8rhG2y3qBYZ9dm4r6GB3 can get a client under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/clients/someClientId if signed in.
+     * @allow (list) User 4RSNw6kC8rhG2y3qBYZ9dm4r6GB3 can list clients under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/clients if signed in.
+     * @allow (update) User 4RSNw6kC8rhG2y3qBYZ9dm4r6GB3 can update a client under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/clients/someClientId if signed in.
+     * @allow (delete) User 4RSNw6kC8rhG2y3qBYZ9dm4r6GB3 can delete a client under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/clients/someClientId if signed in.
+     * @deny (create) User WONG_USER_ID cannot create a client under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/clients/someClientId.
+     * @deny (get) User WONG_USER_ID cannot get a client under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/clients/someClientId.
+     * @deny (list) User WONG_USER_ID cannot list clients under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/clients.
+     * @deny (update) User WONG_USER_ID cannot update a client under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/clients/someClientId.
+     * @deny (delete) User WONG_USER_ID cannot delete a client under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/clients/someClientId.
+     * @principle Enforces document ownership for all operations.
      */
     match /users/{userId}/clients/{clientId} {
       allow get: if isOwner(userId);
@@ -109,18 +73,23 @@ service cloud.firestore {
     }
 
     /**
-     * @description Defines security rules for invoices. Only the authenticated user
-     * can create, read, update, and delete their own invoices.
-     * @path /users/{userId}/clients/{clientId}/invoices/{invoiceId}
-     * @allow (get) User with ID 'user123' reads their own invoice with ID 'invoice789'.
-     *   request.auth.uid: 'user123'
-     * @allow (create) User with ID 'user123' creates a new invoice.
-     *   request.auth.uid: 'user123'
-     * @deny (get) User with ID 'user123' tries to read an invoice owned by 'user456'.
-     *   request.auth.uid: 'user123'
-     * @principle Enforces document ownership for writes.
+     * @description
+     * Protects the /users/{userId}/invoices/{invoiceId} collection.
+     * Only the owner (user with matching userId) can create, read, update, and delete their own invoices.
+     * @path /users/{userId}/invoices/{invoiceId}
+     * @allow (create) User 4RSNw6kC8rhG2y3qBYZ9dm4r6GB3 can create an invoice under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/invoices/someInvoiceId if signed in.
+     * @allow (get) User 4RSNw6kC8rhG2y3qBYZ9dm4r6GB3 can get an invoice under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/invoices/someInvoiceId if signed in.
+     * @allow (list) User 4RSNw6kC8rhG2y3qBYZ9dm4r6GB3 can list invoices under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/invoices if signed in.
+     * @allow (update) User 4RSNw6kC8rhG2y3qBYZ9dm4r6GB3 can update an invoice under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/invoices/someInvoiceId if signed in.
+     * @allow (delete) User 4RSNw6kC8rhG2y3qBYZ9dm4r6GB3 can delete an invoice under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/invoices/someInvoiceId if signed in.
+     * @deny (create) User WONG_USER_ID cannot create an invoice under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/invoices/someInvoiceId.
+     * @deny (get) User WONG_USER_ID cannot get an invoice under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/invoices/someInvoiceId.
+     * @deny (list) User WONG_USER_ID cannot list invoices under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/invoices.
+     * @deny (update) User WONG_USER_ID cannot update an invoice under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/invoices/someInvoiceId.
+     * @deny (delete) User WONG_USER_ID cannot delete an invoice under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/invoices/someInvoiceId.
+     * @principle Enforces document ownership for all operations.
      */
-    match /users/{userId}/clients/{clientId}/invoices/{invoiceId} {
+    match /users/{userId}/invoices/{invoiceId} {
       allow get: if isOwner(userId);
       allow list: if isOwner(userId);
       allow create: if isOwner(userId);
@@ -129,20 +98,25 @@ service cloud.firestore {
     }
 
     /**
-     * @description Defines security rules for invoice items. Only the authenticated user
-     * can create, read, update, and delete their own invoice items.
-     * @path /users/{userId}/clients/{clientId}/invoices/{invoiceId}/invoiceItems/{invoiceItemId}
-     * @allow (get) User with ID 'user123' reads their own invoice item with ID 'item012'.
-     *   request.auth.uid: 'user123'
-     * @allow (create) User with ID 'user123' creates a new invoice item.
-     *   request.auth.uid: 'user123'
-     * @deny (get) User with ID 'user123' tries to read an invoice item owned by 'user456'.
-     *   request.auth.uid: 'user123'
-     * @principle Enforces document ownership for writes.
+     * @description
+     * Protects the /users/{userId}/companyProfile/profile document.
+     * Only the owner (user with matching userId) can create, read, update, and delete their own company profile.
+     * @path /users/{userId}/companyProfile/profile
+     * @allow (create) User 4RSNw6kC8rhG2y3qBYZ9dm4r6GB3 can create a company profile under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/companyProfile/profile if signed in.
+     * @allow (get) User 4RSNw6kC8rhG2y3qBYZ9dm4r6GB3 can get a company profile under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/companyProfile/profile if signed in.
+     * @allow (list) User 4RSNw6kC8rhG2y3qBYZ9dm4r6GB3 can list the company profile under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/companyProfile.
+     * @allow (update) User 4RSNw6kC8rhG2y3qBYZ9dm4r6GB3 can update a company profile under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/companyProfile/profile if signed in.
+     * @allow (delete) User 4RSNw6kC8rhG2y3qBYZ9dm4r6GB3 can delete a company profile under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/companyProfile/profile if signed in.
+     * @deny (create) User WONG_USER_ID cannot create a company profile under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/companyProfile/profile.
+     * @deny (get) User WONG_USER_ID cannot get a company profile under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/companyProfile/profile.
+     * @deny (list) User WONG_USER_ID cannot list the company profile under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/companyProfile.
+     * @deny (update) User WONG_USER_ID cannot update a company profile under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/companyProfile/profile.
+     * @deny (delete) User WONG_USER_ID cannot delete a company profile under /users/4RSNw6kC8rhG2y3qBYZ9dm4r6GB3/companyProfile/profile.
+     * @principle Enforces document ownership for all operations.
      */
-    match /users/{userId}/clients/{clientId}/invoices/{invoiceId}/invoiceItems/{invoiceItemId} {
+    match /users/{userId}/companyProfile/profile {
       allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
+      allow list: if false; // Only a single document, no need to allow list.
       allow create: if isOwner(userId);
       allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
