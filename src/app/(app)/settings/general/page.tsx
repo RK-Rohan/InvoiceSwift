@@ -28,6 +28,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Upload, User as UserIcon } from 'lucide-react';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { Label } from '@/components/ui/label';
+import { type CompanyProfile } from '@/lib/types';
 
 const companyProfileSchema = z.object({
   companyName: z.string().min(1, 'Company name is required.'),
@@ -49,7 +50,7 @@ export default function GeneralSettingsPage() {
     [user, firestore]
   );
 
-  const { data: companyProfile, isLoading } = useDoc<CompanyProfileFormData>(companyProfileRef);
+  const { data: companyProfile, isLoading } = useDoc<CompanyProfile>(companyProfileRef);
 
   const form = useForm<CompanyProfileFormData>({
     resolver: zodResolver(companyProfileSchema),
@@ -94,10 +95,12 @@ export default function GeneralSettingsPage() {
   const onSubmit = async (values: CompanyProfileFormData) => {
     if (!companyProfileRef) return;
     const dataToSave = { ...values, updatedAt: serverTimestamp() };
-    try {
-      await setDoc(companyProfileRef, dataToSave, { merge: true });
-      toast({ title: 'Settings saved successfully!' });
-    } catch (error: any) {
+    
+    setDoc(companyProfileRef, dataToSave, { merge: true })
+    .then(() => {
+        toast({ title: 'Settings saved successfully!' });
+    })
+    .catch((error: any) => {
       if (error.code === 'permission-denied') {
           const permissionError = new FirestorePermissionError({
             path: companyProfileRef.path,
@@ -113,7 +116,7 @@ export default function GeneralSettingsPage() {
           description: error.message || 'Could not save settings.',
         });
       }
-    }
+    });
   };
 
   if (isLoading) {
