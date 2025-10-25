@@ -19,6 +19,7 @@ type InvoicePreviewProps = {
 export default function InvoicePreview({ generatedHtml, companyProfile }: InvoicePreviewProps) {
   const { watch } = useFormContext<InvoiceFormData>();
   const data = watch();
+  const customColumns = data.customColumns || [];
 
   const handlePrint = () => {
     window.print();
@@ -75,6 +76,7 @@ export default function InvoicePreview({ generatedHtml, companyProfile }: Invoic
             <TableHead>Item</TableHead>
             <TableHead className="text-center">Quantity</TableHead>
             <TableHead className="text-right">Price</TableHead>
+            {customColumns.map(col => <TableHead key={col} className="text-right">{col}</TableHead>)}
             <TableHead className="text-right">Total</TableHead>
           </TableRow>
         </TableHeader>
@@ -84,6 +86,11 @@ export default function InvoicePreview({ generatedHtml, companyProfile }: Invoic
               <TableCell className="font-medium">{item.description}</TableCell>
               <TableCell className="text-center">{item.quantity}</TableCell>
               <TableCell className="text-right">{formatCurrency(item.unitPrice || 0)}</TableCell>
+              {customColumns.map(colName => (
+                  <TableCell key={colName} className="text-right">
+                      {item.customFields?.find(cf => cf.name === colName)?.value || '-'}
+                  </TableCell>
+              ))}
               <TableCell className="text-right">{formatCurrency((item.quantity || 0) * (item.unitPrice || 0))}</TableCell>
             </TableRow>
           ))}

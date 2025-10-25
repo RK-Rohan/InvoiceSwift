@@ -20,6 +20,15 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
+  DialogClose,
+} from '@/components/ui/dialog';
 import { type InvoiceFormData, type InvoiceWithId, invoiceFormSchema, type Client, type CompanyProfile } from '@/lib/types';
 import { addInvoice, updateInvoice } from '@/lib/firebase/invoices';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
@@ -37,7 +46,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../ui/card
 import InvoicePreview from './invoice-preview';
 
 type InvoiceFormProps = {
-  invoice: InvoiceWithId | null;
+  invoice?: InvoiceWithId | null;
 };
 
 export default function InvoiceForm({ invoice }: InvoiceFormProps) {
@@ -46,6 +55,8 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   const firestore = useFirestore();
   const { user } = useUser();
   const [generatedHtml, setGeneratedHtml] = useState<string | null>(null);
+  const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false);
+  const [newColumnName, setNewColumnName] = useState('');
 
   const clientsCollection = useMemoFirebase(
     () => (user && firestore ? collection(firestore, 'users', user.uid, 'clients') : null),
@@ -65,12 +76,13 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
       clientId: '',
       clientName: '',
       invoiceNumber: '',
-      items: [{ description: '', quantity: 1, unitPrice: 0 }],
+      items: [{ description: '', quantity: 1, unitPrice: 0, customFields: [] }],
       notes: '',
+      customColumns: [],
     },
   });
 
-  const { control, formState, watch, reset, handleSubmit, setValue } = methods;
+  const { control, formState, watch, reset, handleSubmit, setValue, getValues } = methods;
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -78,6 +90,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   });
   
   const watchedItems = watch('items');
+  const customColumns = watch('customColumns') || [];
   const subtotal = watchedItems.reduce((acc, item) => acc + (item.quantity || 0) * (item.unitPrice || 0), 0);
 
   useEffect(() => {
@@ -86,7 +99,8 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
         ...invoice,
         issueDate: new Date(invoice.issueDate),
         dueDate: new Date(invoice.dueDate),
-        items: invoice.items.map(item => ({...item}))
+        items: invoice.items.map(item => ({...item, customFields: item.customFields || [] })),
+        customColumns: invoice.customColumns || [],
       });
     } else {
       reset({
@@ -95,11 +109,29 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
         invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
         issueDate: new Date(),
         dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
-        items: [{ description: '', quantity: 1, unitPrice: 0 }],
+        items: [{ description: '', quantity: 1, unitPrice: 0, customFields: [] }],
         notes: 'Thank you for your business.',
+        customColumns: [],
       });
     }
   }, [invoice, reset]);
+
+  const handleAddColumn = () => {
+    if (newColumnName && !customColumns.includes(newColumnName)) {
+      const newCustomColumns = [...customColumns, newColumnName];
+      setValue('customColumns', newCustomColumns);
+
+      const currentItems = getValues('items');
+      const updatedItems = currentItems.map(item => ({
+        ...item,
+        customFields: [...(item.customFields || []), { name: newColumnName, value: '' }]
+      }));
+      setValue('items', updatedItems);
+
+      setNewColumnName('');
+      setIsColumnDialogOpen(false);
+    }
+  };
 
   const onSubmit = async (values: InvoiceFormData) => {
     try {
@@ -246,75 +278,128 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
 
                         <div>
                         <FormLabel>Items</FormLabel>
-                        <div className="space-y-2 mt-2">
-                            {fields.map((field, index) => (
-                            <div key={field.id} className="grid grid-cols-12 gap-2 items-start">
-                                <FormField
-                                control={control}
-                                name={`items.${index}.description`}
-                                render={({ field }) => (
-                                    <FormItem className="col-span-6">
-                                    <FormControl>
-                                        <Input placeholder="Item description" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                    </FormItem>
-                                )}
-                                />
-                                <FormField
-                                control={control}
-                                name={`items.${index}.quantity`}
-                                render={({ field }) => (
-                                    <FormItem className="col-span-2">
-                                    <FormControl>
-                                        <Input type="number" placeholder="Qty" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                    </FormItem>
-                                )}
-                                />
-                                <FormField
-                                control={control}
-                                name={`items.${index}.unitPrice`}
-                                render={({ field }) => (
-                                    <FormItem className="col-span-2">
-                                    <FormControl>
-                                        <Input type="number" placeholder="Price" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                    </FormItem>
-                                )}
-                                />
-                                <div className="col-span-1 text-right py-2 font-medium">
-                                    {formatCurrency((watchedItems[index]?.quantity || 0) * (watchedItems[index]?.unitPrice || 0))}
-                                </div>
-                                <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="col-span-1 text-destructive hover:text-destructive"
-                                onClick={() => remove(index)}
-                                >
-                                <Trash2 className="h-4 w-4" />
-                                </Button>
-                            </div>
-                            ))}
+                        <div className="overflow-x-auto">
+                            <table className="w-full mt-2">
+                                <thead>
+                                    <tr>
+                                        <th className="px-2 py-2 text-left w-1/3">Description</th>
+                                        <th className="px-2 py-2 text-left">Qty</th>
+                                        <th className="px-2 py-2 text-left">Price</th>
+                                        {customColumns.map(col => <th key={col} className="px-2 py-2 text-left">{col}</th>)}
+                                        <th className="px-2 py-2 text-right">Total</th>
+                                        <th className="px-2 py-2 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {fields.map((field, index) => (
+                                <tr key={field.id} className="items-start">
+                                    <td>
+                                    <FormField
+                                        control={control}
+                                        name={`items.${index}.description`}
+                                        render={({ field }) => ( <FormItem><FormControl><Input placeholder="Item description" {...field} /></FormControl><FormMessage /></FormItem> )}
+                                    />
+                                    </td>
+                                    <td>
+                                    <FormField
+                                        control={control}
+                                        name={`items.${index}.quantity`}
+                                        render={({ field }) => ( <FormItem><FormControl><Input type="number" placeholder="Qty" {...field} /></FormControl><FormMessage /></FormItem> )}
+                                    />
+                                    </td>
+                                    <td>
+                                    <FormField
+                                        control={control}
+                                        name={`items.${index}.unitPrice`}
+                                        render={({ field }) => ( <FormItem><FormControl><Input type="number" placeholder="Price" {...field} /></FormControl><FormMessage /></FormItem> )}
+                                    />
+                                    </td>
+                                    {customColumns.map(colName => (
+                                        <td key={colName}>
+                                            <FormField
+                                                control={control}
+                                                name={`items.${index}.customFields`}
+                                                render={({ field }) => {
+                                                    const value = field.value?.find(cf => cf.name === colName)?.value || '';
+                                                    return (
+                                                        <Input
+                                                            placeholder={colName}
+                                                            defaultValue={value}
+                                                            onChange={(e) => {
+                                                                const newCustomFields = [...(field.value || [])];
+                                                                const existingFieldIndex = newCustomFields.findIndex(cf => cf.name === colName);
+                                                                if (existingFieldIndex > -1) {
+                                                                    newCustomFields[existingFieldIndex].value = e.target.value;
+                                                                } else {
+                                                                    newCustomFields.push({ name: colName, value: e.target.value });
+                                                                }
+                                                                setValue(`items.${index}.customFields`, newCustomFields);
+                                                            }}
+                                                        />
+                                                    )
+                                                }}
+                                            />
+                                        </td>
+                                    ))}
+                                    <td className="text-right py-2 font-medium align-top">
+                                        {formatCurrency((watchedItems[index]?.quantity || 0) * (watchedItems[index]?.unitPrice || 0))}
+                                    </td>
+                                    <td className='align-top'>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="text-destructive hover:text-destructive"
+                                        onClick={() => remove(index)}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                    </td>
+                                </tr>
+                                ))}
+                                </tbody>
+                            </table>
                         </div>
                             {formState.errors.items && (
                                 <p className="text-sm font-medium text-destructive mt-2">
                                     {typeof formState.errors.items.message === 'string' ? formState.errors.items.message : 'Please add at least one item.'}
                                 </p>
                             )}
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="mt-2"
-                            onClick={() => append({ description: '', quantity: 1, unitPrice: 0 })}
-                        >
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Add Item
-                        </Button>
+                        <div className="mt-2 space-x-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => append({ description: '', quantity: 1, unitPrice: 0, customFields: customColumns.map(name => ({name, value: ''})) })}
+                            >
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Add Item
+                            </Button>
+                             <Dialog open={isColumnDialogOpen} onOpenChange={setIsColumnDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <Button type="button" variant="outline" size="sm">
+                                        <PlusCircle className="mr-2 h-4 w-4" />
+                                        Add Column
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Add Custom Column</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="grid gap-4 py-4">
+                                        <Input 
+                                            placeholder="Column Name (e.g. Discount)"
+                                            value={newColumnName}
+                                            onChange={(e) => setNewColumnName(e.target.value)}
+                                        />
+                                    </div>
+                                    <DialogFooter>
+                                        <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                                        <Button type="button" onClick={handleAddColumn}>Add Column</Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        </div>
                         </div>
 
                         <FormField

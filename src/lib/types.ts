@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 
 export const lineItemSchema = z.object({
@@ -23,6 +24,11 @@ const dateOrStringSchema = z.union([z.date(), z.string()]).transform((val) => {
     return val;
 });
 
+const customFieldSchema = z.object({
+  name: z.string(),
+  value: z.string(),
+});
+
 export const invoiceFormSchema = z.object({
   clientId: z.string().min(1, 'Client is required.'),
   clientName: z.string(),
@@ -33,8 +39,10 @@ export const invoiceFormSchema = z.object({
     description: z.string().min(1, 'Item description is required.'),
     quantity: z.coerce.number().min(1, 'Quantity must be at least 1.'),
     unitPrice: z.coerce.number().min(0, 'Unit price must be non-negative.'),
+    customFields: z.array(customFieldSchema).optional(),
   })).min(1, 'At least one item is required.'),
   notes: z.string().optional(),
+  customColumns: z.array(z.string()).optional(),
 });
 
 export const invoiceSchema = invoiceFormSchema.extend({
