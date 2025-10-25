@@ -1,7 +1,7 @@
 'use client';
 
-import InvoiceForm from '@/components/invoice/invoice-form';
+import InvoiceTemplatePage from '@/app/(app)/invoices/template/page';
 
 export default function NewInvoicePage() {
-  return <InvoiceForm invoice={null} />;
+  return <InvoiceTemplatePage />;
 }

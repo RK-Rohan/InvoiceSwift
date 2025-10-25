@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useFormContext, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,18 +50,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   );
   const { data: clients } = useCollection<Client>(clientsCollection);
 
-  const form = useForm<InvoiceFormData>({
-    resolver: zodResolver(invoiceFormSchema),
-    defaultValues: {
-      clientId: '',
-      clientName: '',
-      invoiceNumber: '',
-      issueDate: new Date(),
-      dueDate: new Date(),
-      items: [{ description: '', quantity: 1, unitPrice: 0 }],
-      notes: '',
-    },
-  });
+  const form = useFormContext<InvoiceFormData>();
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
