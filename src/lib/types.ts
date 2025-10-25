@@ -7,12 +7,17 @@ export const lineItemSchema = z.object({
   price: z.coerce.number().min(0, 'Price must be positive.'),
 });
 
-export const clientSchema = z.object({
-  id: z.string(),
+export const clientFormSchema = z.object({
   name: z.string().min(1, 'Client name is required.'),
   email: z.string().email('Invalid email address.'),
+  phoneNumber: z.string().optional(),
   address: z.string().min(1, 'Client address is required.'),
 });
+
+export const clientSchema = clientFormSchema.extend({
+  id: z.string(),
+});
+
 
 export const invoiceSchema = z.object({
   from_name: z.string().min(1, 'Your name is required.'),
@@ -37,5 +42,6 @@ export const customizationSchema = z.object({
 
 export type LineItem = z.infer<typeof lineItemSchema>;
 export type Client = z.infer<typeof clientSchema>;
+export type ClientFormData = z.infer<typeof clientFormSchema>;
 export type Invoice = z.infer<typeof invoiceSchema>;
 export type CustomizationData = z.infer<typeof customizationSchema>;
