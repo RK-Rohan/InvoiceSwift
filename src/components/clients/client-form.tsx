@@ -67,12 +67,18 @@ export default function ClientForm({ isOpen, onClose, client }: ClientFormProps)
         toast({ title: 'Client added successfully' });
       }
       onClose();
-    } catch (error) {
-      // Errors are now thrown and will be caught here.
-      // The FirestorePermissionError is already emitted, so we don't need to toast it.
-      console.error("Failed to save client:", error);
-      // Optionally, you could show a generic failure toast if it's not a permission error
-      // but for now, we'll let the permission error be the main feedback.
+    } catch (error: any) {
+      // The FirestorePermissionError is thrown by our logic in `addClient`
+      // and caught by the global error handler, so we don't need to toast it here.
+      // We only need to log other unexpected errors.
+      if (error.name !== 'FirebaseError') {
+        console.error("Failed to save client:", error);
+        toast({
+            variant: "destructive",
+            title: "Uh oh! Something went wrong.",
+            description: error.message || "Could not save client.",
+        });
+      }
     }
   };
 
@@ -143,7 +149,9 @@ export default function ClientForm({ isOpen, onClose, client }: ClientFormProps)
               <Button type="button" variant="ghost" onClick={onClose}>
                 Cancel
               </Button>
-              <Button type="submit">{client ? 'Save Changes' : 'Add Client'}</Button>
+              <Button type="submit" disabled={form.formState.isSubmitting}>
+                {client ? 'Save Changes' : 'Add Client'}
+              </Button>
             </DialogFooter>
           </form>
         </Form>
