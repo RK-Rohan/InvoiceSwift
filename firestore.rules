@@ -1,112 +1,106 @@
 /**
  * @fileOverview Firestore Security Rules for InvoiceSwift.
  *
- * Core Philosophy: This ruleset enforces a strict user-ownership model. Each user can only access the clients, invoices, and invoice items nested under their own user ID.
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model, ensuring that only the authenticated user can access their own data.
  *
  * Data Structure:
- * - /users/{userId}/clients/{clientId}
- * - /users/{userId}/clients/{clientId}/invoices/{invoiceId}
- * - /users/{userId}/clients/{clientId}/invoices/{invoiceId}/invoiceItems/{invoiceItemId}
+ * All data is nested under /users/{userId}, creating a clear separation of user data.  Clients, invoices, and invoice items are subcollections of each user.
  *
  * Key Security Decisions:
- * - Only authenticated users can access data.
- * - Data is strictly namespaced under the user's UID.
- * - List operations are allowed only for the owner of the data.
- *
- * Denormalization for Authorization:
- * - The path `/users/{userId}/...` serves as the source of truth for authorization, removing the need for `get()` calls.
+ * - Path-based ownership is enforced for all data. The authenticated user ID must match the {userId} path segment.
+ * - Invoices and InvoiceItems inherit ownership from their parent Client document via path structure.
+ * - List operations are restricted to the owner of the data.
+ * - Data validation is relaxed to facilitate rapid prototyping. Only relational integrity (ownership) is validated.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to the /users/{userId}/clients/{clientId} collection.
-     * @path /databases/{database}/documents/users/{userId}/clients/{clientId}
-     * @allow (create) - Authenticated user with UID 'user123' can create a new client under their user ID: request.auth.uid == 'user123'
-     * @allow (get) - Authenticated user with UID 'user123' can get their own client: request.auth.uid == 'user123'
-     * @allow (update) - Authenticated user with UID 'user123' can update their own client: request.auth.uid == 'user123'
-     * @allow (delete) - Authenticated user with UID 'user123' can delete their own client: request.auth.uid == 'user123'
-     * @allow (list) - Authenticated user with UID 'user123' can list their own clients: request.auth.uid == 'user123'
-     * @deny (create) - Authenticated user with UID 'user456' cannot create a client under another user's ID ('user123'): request.auth.uid != 'user123'
-     * @deny (get) - Authenticated user with UID 'user456' cannot get a client under another user's ID ('user123'): request.auth.uid != 'user123'
-     * @deny (update) - Authenticated user with UID 'user456' cannot update a client under another user's ID ('user123'): request.auth.uid != 'user123'
-     * @deny (delete) - Authenticated user with UID 'user456' cannot delete a client under another user's ID ('user123'): request.auth.uid != 'user123'
-     * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
+     * @description Manages access to client documents. Only the authenticated user can manage their own clients.
+     * @path /users/{userId}/clients/{clientId}
+     * @allow (create) - Authenticated user creates a new client document with their user ID in the path and matching `id` field.
+     * @allow (get, list) - Authenticated user reads their own client data.
+     * @allow (update, delete) - Authenticated user updates or deletes their own client data.
+     * @deny (create) - User attempts to create a client for another user by providing a mismatched `id`.
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId}/clients/{clientId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == clientId;
-      allow update: if isSignedIn() && isExistingOwner(userId) && resource.data.id == request.resource.data.id;
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+      // Helper function to check if the authenticated user is the owner of the document.
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      // Helper function to check if the authenticated user is the owner of an existing document.
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      // Helper function to check if the userId matches the clientId on document creation.
+      function isValidClientOwnerOnCreate(userId) {
+          return request.resource.data.id == userId;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidClientOwnerOnCreate(userId);
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Controls access to the /users/{userId}/clients/{clientId}/invoices/{invoiceId} collection.
-     * @path /databases/{database}/documents/users/{userId}/clients/{clientId}/invoices/{invoiceId}
-     * @allow (create) - Authenticated user with UID 'user123' can create a new invoice under their client and user ID: request.auth.uid == 'user123'
-     * @allow (get) - Authenticated user with UID 'user123' can get their own invoice: request.auth.uid == 'user123'
-     * @allow (update) - Authenticated user with UID 'user123' can update their own invoice: request.auth.uid == 'user123'
-     * @allow (delete) - Authenticated user with UID 'user123' can delete their own invoice: request.auth.uid == 'user123'
-     * @allow (list) - Authenticated user with UID 'user123' can list their own invoices: request.auth.uid == 'user123'
-     * @deny (create) - Authenticated user with UID 'user456' cannot create an invoice under another user's ID ('user123'): request.auth.uid != 'user123'
-     * @deny (get) - Authenticated user with UID 'user456' cannot get an invoice under another user's ID ('user123'): request.auth.uid != 'user123'
-     * @deny (update) - Authenticated user with UID 'user456' cannot update an invoice under another user's ID ('user123'): request.auth.uid != 'user123'
-     * @deny (delete) - Authenticated user with UID 'user456' cannot delete an invoice under another user's ID ('user123'): request.auth.uid != 'user123'
-     * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
+     * @description Manages access to invoice documents under a specific client. Only the authenticated user (owner of the client) can manage invoices.
+     * @path /users/{userId}/clients/{clientId}/invoices/{invoiceId}
+     * @allow (create) - Authenticated user creates a new invoice document under their client.
+     * @allow (get, list) - Authenticated user reads invoices under their client.
+     * @allow (update, delete) - Authenticated user updates or deletes invoices under their client.
+     * @deny (create) - User attempts to create an invoice for another user or client.
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId}/clients/{clientId}/invoices/{invoiceId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.clientId == clientId && isValidInvoiceData();
-      allow update: if isSignedIn() && isExistingOwner(userId) && resource.data.clientId == request.resource.data.clientId;
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+      // Helper function to check if the authenticated user is the owner of the document.
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      // Helper function to check if the authenticated user is the owner of an existing document.
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Controls access to the /users/{userId}/clients/{clientId}/invoices/{invoiceId}/invoiceItems/{invoiceItemId} collection.
-     * @path /databases/{database}/documents/users/{userId}/clients/{clientId}/invoices/{invoiceId}/invoiceItems/{invoiceItemId}
-     * @allow (create) - Authenticated user with UID 'user123' can create a new invoice item under their invoice, client, and user ID: request.auth.uid == 'user123'
-     * @allow (get) - Authenticated user with UID 'user123' can get their own invoice item: request.auth.uid == 'user123'
-     * @allow (update) - Authenticated user with UID 'user123' can update their own invoice item: request.auth.uid == 'user123'
-     * @allow (delete) - Authenticated user with UID 'user123' can delete their own invoice item: request.auth.uid == 'user123'
-     * @allow (list) - Authenticated user with UID 'user123' can list their own invoice items: request.auth.uid == 'user123'
-     * @deny (create) - Authenticated user with UID 'user456' cannot create an invoice item under another user's ID ('user123'): request.auth.uid != 'user123'
-     * @deny (get) - Authenticated user with UID 'user456' cannot get an invoice item under another user's ID ('user123'): request.auth.uid != 'user123'
-     * @deny (update) - Authenticated user with UID 'user456' cannot update an invoice item under another user's ID ('user123'): request.auth.uid != 'user123'
-     * @deny (delete) - Authenticated user with UID 'user456' cannot delete an invoice item under another user's ID ('user123'): request.auth.uid != 'user123'
-     * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
+     * @description Manages access to invoice item documents under a specific invoice. Only the authenticated user (owner of the invoice) can manage invoice items.
+     * @path /users/{userId}/clients/{clientId}/invoices/{invoiceId}/invoiceItems/{invoiceItemId}
+     * @allow (create) - Authenticated user creates a new invoice item document under their invoice.
+     * @allow (get, list) - Authenticated user reads invoice items under their invoice.
+     * @allow (update, delete) - Authenticated user updates or deletes invoice items under their invoice.
+     * @deny (create) - User attempts to create an invoice item for another user or invoice.
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId}/clients/{clientId}/invoices/{invoiceId}/invoiceItems/{invoiceItemId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.invoiceId == invoiceId && isValidInvoiceItemData();
-      allow update: if isSignedIn() && isExistingOwner(userId) && resource.data.invoiceId == request.resource.data.invoiceId;
-      allow delete: if isSignedIn() && isExistingOwner(userId);
-    }
+      // Helper function to check if the authenticated user is the owner of the document.
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
 
-    // Helper functions
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    function isExistingOwner(userId) {
+      // Helper function to check if the authenticated user is the owner of an existing document.
+      function isExistingOwner(userId) {
         return isOwner(userId) && resource != null;
-    }
+      }
 
-    // Basic validation for Invoice data on create (only clientId consistency)
-    function isValidInvoiceData() {
-        return true; // Placeholder for more specific validation if needed
-    }
-
-     // Basic validation for InvoiceItem data on create (only invoiceId consistency)
-    function isValidInvoiceItemData() {
-        return true; // Placeholder for more specific validation if needed
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
   }
 }

@@ -9,7 +9,13 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { initializeFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import {
+  initializeFirebase,
+  errorEmitter,
+  FirestorePermissionError,
+  deleteDocumentNonBlocking,
+  updateDocumentNonBlocking,
+} from '@/firebase';
 import type { ClientFormData } from '@/lib/types';
 
 const { firestore, auth } = initializeFirebase();
@@ -22,15 +28,16 @@ function getClientsCollection() {
 
 export function addClient(clientData: ClientFormData) {
   const clientsCollection = getClientsCollection();
-  // Return the promise
-  return addDoc(clientsCollection, {
+  const data = {
     ...clientData,
     createdAt: serverTimestamp(),
-  }).catch(error => {
+  };
+  // Return the promise from addDoc
+  return addDoc(clientsCollection, data).catch(error => {
     const permissionError = new FirestorePermissionError({
       path: clientsCollection.path,
       operation: 'create',
-      requestResourceData: clientData,
+      requestResourceData: data,
     });
     errorEmitter.emit('permission-error', permissionError);
     // Re-throw the original error to be caught by the calling function's catch block
@@ -40,26 +47,14 @@ export function addClient(clientData: ClientFormData) {
 
 export function updateClient(clientId: string, clientData: Partial<ClientFormData>) {
   const clientDoc = doc(getClientsCollection(), clientId);
-  updateDoc(clientDoc, {
+  const data = {
     ...clientData,
     updatedAt: serverTimestamp(),
-  }).catch(error => {
-    const permissionError = new FirestorePermissionError({
-      path: clientDoc.path,
-      operation: 'update',
-      requestResourceData: clientData,
-    });
-    errorEmitter.emit('permission-error', permissionError);
-  });
+  };
+  updateDocumentNonBlocking(clientDoc, data);
 }
 
 export function deleteClient(clientId: string) {
   const clientDoc = doc(getClientsCollection(), clientId);
-  deleteDoc(clientDoc).catch(error => {
-    const permissionError = new FirestorePermissionError({
-      path: clientDoc.path,
-      operation: 'delete',
-    });
-    errorEmitter.emit('permission-error', permissionError);
-  });
+  deleteDocumentNonBlocking(clientDoc);
 }
