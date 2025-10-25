@@ -2,17 +2,25 @@
 
 import { FirebaseProvider } from './provider';
 import { initializeFirebase } from '.';
+import type { FirebaseApp } from 'firebase/app';
+import type { Auth } from 'firebase/auth';
+import type { Firestore } from 'firebase/firestore';
 
-// Note: We are not using this file in this implementation,
-// but it is good practice to have it for client-side only firebase initialization.
-// We are initializing firebase in the root layout for simplicity.
+let firebaseApp: FirebaseApp | null = null;
+let auth: Auth | null = null;
+let firestore: Firestore | null = null;
 
 export function FirebaseClientProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { firebaseApp, firestore, auth } = initializeFirebase();
+  if (!firebaseApp || !auth || !firestore) {
+    const initialized = initializeFirebase();
+    firebaseApp = initialized.firebaseApp;
+    auth = initialized.auth;
+    firestore = initialized.firestore;
+  }
 
   return (
     <FirebaseProvider app={firebaseApp} auth={auth} firestore={firestore}>

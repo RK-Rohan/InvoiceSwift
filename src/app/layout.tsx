@@ -2,9 +2,8 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
-import { FirebaseProvider } from '@/firebase/provider';
-import { initializeFirebase } from '@/firebase';
 import FirebaseErrorListener from '@/components/FirebaseErrorListener';
+import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -18,15 +17,14 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { firebaseApp, firestore, auth } = initializeFirebase();
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans antialiased`}>
-        <FirebaseProvider app={firebaseApp} auth={auth} firestore={firestore}>
+        <FirebaseClientProvider>
           {children}
           <Toaster />
           <FirebaseErrorListener />
-        </FirebaseProvider>
+        </FirebaseClientProvider>
       </body>
     </html>
   );

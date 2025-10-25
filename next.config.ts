@@ -30,21 +30,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      // Fixes npm packages that depend on `fs` module
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-      };
-    }
-    // Fixes `crypto` module not found error in browser
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      crypto: false,
-    };
-    return config;
-  },
 };
 
 export default nextConfig;
