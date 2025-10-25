@@ -54,22 +54,20 @@ export default function SidebarNav() {
           item.children ? (
             <Collapsible key={item.label} asChild open={openSettings} onOpenChange={setOpenSettings}>
               <>
-                <CollapsibleTrigger asChild>
-                  <div
+                <CollapsibleTrigger
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary w-full',
+                    pathname.startsWith('/settings') && 'text-primary bg-muted'
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                  <ChevronDown
                     className={cn(
-                      'flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',
-                      pathname.startsWith('/settings') && 'text-primary bg-muted'
+                      'ml-auto h-4 w-4 transition-transform',
+                      openSettings && 'rotate-180'
                     )}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {item.label}
-                    <ChevronDown
-                      className={cn(
-                        'ml-auto h-4 w-4 transition-transform',
-                        openSettings && 'rotate-180'
-                      )}
-                    />
-                  </div>
+                  />
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <div className="pl-7">
