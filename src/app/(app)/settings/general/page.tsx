@@ -22,7 +22,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Upload, User as UserIcon } from 'lucide-react';
@@ -93,16 +93,26 @@ export default function GeneralSettingsPage() {
 
   const onSubmit = async (values: CompanyProfileFormData) => {
     if (!companyProfileRef) return;
+    const dataToSave = { ...values, updatedAt: serverTimestamp() };
     try {
-      await setDoc(companyProfileRef, { ...values, updatedAt: serverTimestamp() }, { merge: true });
+      await setDoc(companyProfileRef, dataToSave, { merge: true });
       toast({ title: 'Settings saved successfully!' });
     } catch (error: any) {
-      console.error(error);
-      toast({
-        variant: 'destructive',
-        title: 'Uh oh! Something went wrong.',
-        description: error.message || 'Could not save settings.',
-      });
+      if (error.code === 'permission-denied') {
+          const permissionError = new FirestorePermissionError({
+            path: companyProfileRef.path,
+            operation: 'write',
+            requestResourceData: dataToSave,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      } else {
+        console.error(error);
+        toast({
+          variant: 'destructive',
+          title: 'Uh oh! Something went wrong.',
+          description: error.message || 'Could not save settings.',
+        });
+      }
     }
   };
 
