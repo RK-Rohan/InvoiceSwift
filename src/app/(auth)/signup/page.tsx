@@ -49,7 +49,7 @@ export default function SignupForm() {
     if (!auth) return;
     try {
       await createUserWithEmailAndPassword(auth, values.email, values.password);
-      router.push('/dashboard');
+      router.push('/invoices');
     } catch (error: any) {
       toast({
         variant: 'destructive',
