@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -29,7 +29,7 @@ import {
   DialogTrigger,
   DialogClose,
 } from '@/components/ui/dialog';
-import { type InvoiceFormData, type InvoiceWithId, invoiceFormSchema, type Client, type CompanyProfile } from '@/lib/types';
+import { type InvoiceFormData, type InvoiceWithId, invoiceFormSchema, type Client, type CompanyProfile, type CustomColumn } from '@/lib/types';
 import { addInvoice, updateInvoice } from '@/lib/firebase/invoices';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
@@ -59,6 +59,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   const [generatedHtml, setGeneratedHtml] = useState<string | null>(null);
   const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
+  const [newColumnType, setNewColumnType] = useState<'text' | 'subtractive' | 'additive'>('text');
   const [newColumnPosition, setNewColumnPosition] = useState<'before' | 'after'>('after');
   const [referenceColumn, setReferenceColumn] = useState<string>('');
 
@@ -96,8 +97,24 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   
   const watchedItems = watch('items');
   const customColumns = watch('customColumns') || [];
-  const allColumns = ['Description', 'Qty', 'Price', ...customColumns];
-  const subtotal = watchedItems.reduce((acc, item) => acc + (item.quantity || 0) * (item.unitPrice || 0), 0);
+  
+  const allColumns = useMemo(() => ['Description', 'Qty', 'Price', ...customColumns.map(c => c.name)], [customColumns]);
+
+  const calculateLineItemTotal = (item: any) => {
+    let total = (item.quantity || 0) * (item.unitPrice || 0);
+    item.customFields?.forEach((field: any) => {
+      const column = customColumns.find(c => c.name === field.name);
+      const value = parseFloat(field.value) || 0;
+      if (column?.type === 'subtractive') {
+        total -= value;
+      } else if (column?.type === 'additive') {
+        total += value;
+      }
+    });
+    return total;
+  };
+
+  const subtotal = useMemo(() => watchedItems.reduce((acc, item) => acc + calculateLineItemTotal(item), 0), [watchedItems, customColumns]);
 
   useEffect(() => {
     if (invoice) {
@@ -126,35 +143,31 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
     if (isColumnDialogOpen) {
       setReferenceColumn(allColumns[allColumns.length - 1]);
     }
-  }, [isColumnDialogOpen]);
+  }, [isColumnDialogOpen, allColumns]);
 
   const handleAddColumn = () => {
-    if (newColumnName && !customColumns.includes(newColumnName)) {
+    if (newColumnName && !customColumns.find(c => c.name === newColumnName)) {
       const currentCustomColumns = getValues('customColumns') || [];
+      const newColumn: CustomColumn = { name: newColumnName, type: newColumnType };
+
       let insertIndex = currentCustomColumns.length;
 
       if (referenceColumn) {
-        const refColIndex = allColumns.indexOf(referenceColumn);
-        const customColOffset = 3; // Number of default columns
-        const customRefIndex = currentCustomColumns.indexOf(referenceColumn);
+          const isDefaultColumn = ['Description', 'Qty', 'Price'].includes(referenceColumn);
+          const refIndex = isDefaultColumn 
+            ? allColumns.indexOf(referenceColumn)
+            : currentCustomColumns.findIndex(c => c.name === referenceColumn);
 
-        if (newColumnPosition === 'before') {
-           if (refColIndex < customColOffset) {
-             insertIndex = 0;
-           } else {
-             insertIndex = customRefIndex;
-           }
-        } else { // 'after'
-            if (refColIndex < customColOffset) {
-                insertIndex = 0;
-            } else {
-                insertIndex = customRefIndex + 1;
-            }
-        }
+          if (newColumnPosition === 'before') {
+              insertIndex = isDefaultColumn ? 0 : refIndex;
+          } else { // 'after'
+              insertIndex = isDefaultColumn ? refIndex - 2 : refIndex + 1;
+          }
       }
 
+
       const newCustomColumns = [...currentCustomColumns];
-      newCustomColumns.splice(insertIndex, 0, newColumnName);
+      newCustomColumns.splice(insertIndex, 0, newColumn);
       setValue('customColumns', newCustomColumns);
 
       const currentItems = getValues('items');
@@ -168,13 +181,14 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
       setNewColumnName('');
       setReferenceColumn('');
       setNewColumnPosition('after');
+      setNewColumnType('text');
       setIsColumnDialogOpen(false);
     }
   };
 
   const handleRemoveColumn = (columnNameToRemove: string) => {
     // Remove the column from the customColumns array
-    const newCustomColumns = customColumns.filter(col => col !== columnNameToRemove);
+    const newCustomColumns = customColumns.filter(col => col.name !== columnNameToRemove);
     setValue('customColumns', newCustomColumns);
 
     // Remove the corresponding custom field from each item
@@ -190,7 +204,11 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
     try {
         const invoiceData = {
             ...values,
-            totalAmount: subtotal
+            totalAmount: subtotal,
+            items: values.items.map(item => ({
+              ...item,
+              customFields: (item.customFields || []).map(cf => ({...cf})) // Ensure it's a plain object
+            }))
         }
       if (invoice) {
         await updateInvoice(invoice.id, invoiceData);
@@ -339,15 +357,15 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                                         <th className="px-2 py-2 text-left">Qty</th>
                                         <th className="px-2 py-2 text-left">Price</th>
                                         {customColumns.map(col => (
-                                            <th key={col} className="px-2 py-2 text-left">
+                                            <th key={col.name} className="px-2 py-2 text-left">
                                                 <div className="flex items-center gap-1">
-                                                    {col}
+                                                    {col.name}
                                                     <Button
                                                         type="button"
                                                         variant="ghost"
                                                         size="icon"
                                                         className="h-5 w-5 text-destructive/70 hover:text-destructive"
-                                                        onClick={() => handleRemoveColumn(col)}
+                                                        onClick={() => handleRemoveColumn(col.name)}
                                                     >
                                                         <X className="h-4 w-4" />
                                                     </Button>
@@ -382,28 +400,26 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                                         render={({ field }) => ( <FormItem><FormControl><Input type="number" placeholder="Price" {...field} /></FormControl><FormMessage /></FormItem> )}
                                     />
                                     </td>
-                                    {customColumns.map((colName, colIndex) => {
-                                        // Find the index of the custom field for the current column
-                                        const customFieldIndex = (getValues(`items.${index}.customFields`) || []).findIndex(cf => cf.name === colName);
-                                        const fieldName = `items.${index}.customFields.${customFieldIndex}.value`;
-                                        
-                                        return (
-                                            <td key={colName}>
-                                                <FormField
-                                                    control={control}
-                                                    name={`items.${index}.customFields`}
-                                                    render={() => (
-                                                      <Input
-                                                          placeholder={colName}
-                                                          {...methods.register(fieldName as any)}
-                                                      />
-                                                    )}
-                                                />
-                                            </td>
-                                        )
+                                    {customColumns.map((col, colIndex) => {
+                                      const fieldName = `items.${index}.customFields.${colIndex}.value`;
+                                      return (
+                                        <td key={col.name}>
+                                            <FormField
+                                                control={control}
+                                                name={`items.${index}.customFields`}
+                                                render={() => (
+                                                    <Input
+                                                        placeholder={col.name}
+                                                        type={col.type === 'text' ? 'text' : 'number'}
+                                                        {...methods.register(fieldName as any)}
+                                                    />
+                                                )}
+                                            />
+                                        </td>
+                                      )
                                     })}
                                     <td className="text-right py-2 font-medium align-top">
-                                        {formatCurrency((watchedItems[index]?.quantity || 0) * (watchedItems[index]?.unitPrice || 0))}
+                                        {formatCurrency(calculateLineItemTotal(watchedItems[index]))}
                                     </td>
                                     <td className='align-top'>
                                     <Button
@@ -431,7 +447,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                onClick={() => append({ description: '', quantity: 1, unitPrice: 0, customFields: customColumns.map(name => ({name, value: ''})) })}
+                                onClick={() => append({ description: '', quantity: 1, unitPrice: 0, customFields: customColumns.map(c => ({name: c.name, value: ''})) })}
                             >
                                 <PlusCircle className="mr-2 h-4 w-4" />
                                 Add Item
@@ -457,6 +473,29 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                                                 onChange={(e) => setNewColumnName(e.target.value)}
                                             />
                                         </div>
+
+                                        <div className="space-y-2">
+                                          <Label>Behavior</Label>
+                                          <RadioGroup
+                                              value={newColumnType}
+                                              onValueChange={(value: 'text' | 'subtractive' | 'additive') => setNewColumnType(value)}
+                                              className="flex space-x-4"
+                                          >
+                                              <div className="flex items-center space-x-2">
+                                                  <RadioGroupItem value="text" id="type-text" />
+                                                  <Label htmlFor="type-text">Text</Label>
+                                              </div>
+                                              <div className="flex items-center space-x-2">
+                                                  <RadioGroupItem value="subtractive" id="type-sub" />
+                                                  <Label htmlFor="type-sub">Subtract from Total</Label>
+                                              </div>
+                                              <div className="flex items-center space-x-2">
+                                                  <RadioGroupItem value="additive" id="type-add" />
+                                                  <Label htmlFor="type-add">Add to Total</Label>
+                                              </div>
+                                          </RadioGroup>
+                                        </div>
+
                                         <div className="space-y-2">
                                             <Label>Position</Label>
                                             <RadioGroup 
@@ -531,5 +570,3 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
     </FormProvider>
   );
 }
-
-    

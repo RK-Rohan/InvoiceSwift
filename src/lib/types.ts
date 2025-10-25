@@ -24,6 +24,11 @@ const dateOrStringSchema = z.union([z.date(), z.string()]).transform((val) => {
     return val;
 });
 
+const customColumnSchema = z.object({
+  name: z.string(),
+  type: z.enum(['text', 'subtractive', 'additive']),
+});
+
 const customFieldSchema = z.object({
   name: z.string(),
   value: z.string(),
@@ -42,7 +47,7 @@ export const invoiceFormSchema = z.object({
     customFields: z.array(customFieldSchema).optional(),
   })).min(1, 'At least one item is required.'),
   notes: z.string().optional(),
-  customColumns: z.array(z.string()).optional(),
+  customColumns: z.array(customColumnSchema).optional(),
 });
 
 export const invoiceSchema = invoiceFormSchema.extend({
@@ -76,3 +81,4 @@ export type Invoice = z.infer<typeof invoiceSchema>;
 export type InvoiceWithId = z.infer<typeof invoiceWithIdSchema>;
 export type CustomizationData = z.infer<typeof customizationSchema>;
 export type CompanyProfile = z.infer<typeof companyProfileSchema>;
+export type CustomColumn = z.infer<typeof customColumnSchema>;

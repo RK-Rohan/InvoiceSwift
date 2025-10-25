@@ -1,6 +1,7 @@
 
 'use client';
 
+import { useMemo } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -8,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Printer, Download, Building } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn, formatCurrency } from '@/lib/utils';
-import type { InvoiceFormData, CompanyProfile } from '@/lib/types';
+import type { InvoiceFormData, CompanyProfile, CustomColumn } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 
 type InvoicePreviewProps = {
@@ -37,8 +38,23 @@ export default function InvoicePreview({ generatedHtml, companyProfile }: Invoic
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
+  
+  const calculateLineItemTotal = (item: any) => {
+    let total = (item.quantity || 0) * (item.unitPrice || 0);
+    item.customFields?.forEach((field: any) => {
+      const column = customColumns.find(c => c.name === field.name);
+      const value = parseFloat(field.value) || 0;
+      if (column?.type === 'subtractive') {
+        total -= value;
+      } else if (column?.type === 'additive') {
+        total += value;
+      }
+    });
+    return total;
+  };
 
-  const subtotal = data.items.reduce((acc, item) => acc + (item.quantity || 0) * (item.unitPrice || 0), 0);
+  const subtotal = useMemo(() => data.items.reduce((acc, item) => acc + calculateLineItemTotal(item), 0), [data.items, customColumns]);
+
 
   const DefaultPreview = () => (
     <CardContent className="p-6 sm:p-8">
@@ -76,7 +92,7 @@ export default function InvoicePreview({ generatedHtml, companyProfile }: Invoic
             <TableHead>Item</TableHead>
             <TableHead className="text-center">Quantity</TableHead>
             <TableHead className="text-right">Price</TableHead>
-            {customColumns.map(col => <TableHead key={col} className="text-right">{col}</TableHead>)}
+            {customColumns.map(col => <TableHead key={col.name} className="text-right">{col.name}</TableHead>)}
             <TableHead className="text-right">Total</TableHead>
           </TableRow>
         </TableHeader>
@@ -86,22 +102,18 @@ export default function InvoicePreview({ generatedHtml, companyProfile }: Invoic
               <TableCell className="font-medium">{item.description}</TableCell>
               <TableCell className="text-center">{item.quantity}</TableCell>
               <TableCell className="text-right">{formatCurrency(item.unitPrice || 0)}</TableCell>
-              {customColumns.map(colName => (
-                  <TableCell key={colName} className="text-right">
-                      {item.customFields?.find(cf => cf.name === colName)?.value || '-'}
+              {customColumns.map(col => (
+                  <TableCell key={col.name} className="text-right">
+                      {item.customFields?.find(cf => cf.name === col.name)?.value || '-'}
                   </TableCell>
               ))}
-              <TableCell className="text-right">{formatCurrency((item.quantity || 0) * (item.unitPrice || 0))}</TableCell>
+              <TableCell className="text-right">{formatCurrency(calculateLineItemTotal(item))}</TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
       <div className="flex justify-end mt-8">
         <div className="w-full max-w-xs space-y-2">
-          <div className="flex justify-between">
-            <span>Subtotal</span>
-            <span>{formatCurrency(subtotal)}</span>
-          </div>
           <div className="flex justify-between font-bold text-lg border-t pt-2">
             <span>Total</span>
             <span>{formatCurrency(subtotal)}</span>
