@@ -123,7 +123,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
 
   return (
     <FormProvider {...methods}>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 gap-8">
             <Card>
                 <CardHeader>
                     <CardTitle>{invoice ? 'Edit Invoice' : 'Create New Invoice'}</CardTitle>
@@ -340,7 +340,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                     </form>
                 </Form>
             </Card>
-            <div className="lg:sticky top-24 self-start">
+            <div>
                 <InvoicePreview generatedHtml={generatedHtml} />
             </div>
         </div>
