@@ -1,4 +1,4 @@
-import type {NextConfig} from 'next';
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -29,6 +29,21 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+  },
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // Fixes npm packages that depend on `fs` module
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+      };
+    }
+    // Fixes `crypto` module not found error in browser
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      crypto: false,
+    };
+    return config;
   },
 };
 
