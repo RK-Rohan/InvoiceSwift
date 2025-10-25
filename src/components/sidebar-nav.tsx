@@ -13,7 +13,6 @@ import {
   FileText,
   Users,
   Settings,
-  LayoutDashboard,
   ChevronDown,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
@@ -50,58 +49,60 @@ export default function SidebarNav() {
   const [openSettings, setOpenSettings] = useState(pathname.startsWith('/settings'));
 
   return (
-    <SidebarContent>
-      <SidebarMenu>
+    <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
         {menuItems.map((item) =>
           item.children ? (
             <Collapsible key={item.label} asChild open={openSettings} onOpenChange={setOpenSettings}>
-              <SidebarMenuItem>
+              <>
                 <CollapsibleTrigger asChild>
-                  <SidebarMenuButton
-                    className="justify-between"
-                    isActive={pathname.startsWith('/settings')}
+                  <div
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',
+                      pathname.startsWith('/settings') && 'text-primary bg-muted'
+                    )}
                   >
-                    <div className="flex items-center gap-2">
-                      <item.icon />
-                      <span>{item.label}</span>
-                    </div>
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
                     <ChevronDown
                       className={cn(
-                        'h-4 w-4 transition-transform',
+                        'ml-auto h-4 w-4 transition-transform',
                         openSettings && 'rotate-180'
                       )}
                     />
-                  </SidebarMenuButton>
+                  </div>
                 </CollapsibleTrigger>
-                <CollapsibleContent asChild>
-                  <SidebarMenuSub>
+                <CollapsibleContent>
+                  <div className="pl-7">
                     {item.children.map((child) => (
-                      <SidebarMenuSubItem key={child.label}>
-                        <Link href={child.href} passHref>
-                          <SidebarMenuSubButton
-                            isActive={pathname === child.href}
-                          >
-                            {child.label}
-                          </SidebarMenuSubButton>
-                        </Link>
-                      </SidebarMenuSubItem>
+                      <Link
+                        key={child.label}
+                        href={child.href}
+                        className={cn(
+                          'flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',
+                          pathname === child.href && 'text-primary'
+                        )}
+                      >
+                        {child.label}
+                      </Link>
                     ))}
-                  </SidebarMenuSub>
+                  </div>
                 </CollapsibleContent>
-              </SidebarMenuItem>
+              </>
             </Collapsible>
           ) : (
-            <SidebarMenuItem key={item.label}>
-              <Link href={item.href} passHref>
-                <SidebarMenuButton isActive={pathname === item.href}>
-                  <item.icon />
-                  {item.label}
-                </SidebarMenuButton>
-              </Link>
-            </SidebarMenuItem>
+            <Link
+              key={item.label}
+              href={item.href}
+              className={cn(
+                'flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',
+                pathname === item.href && 'text-primary bg-muted'
+              )}
+            >
+              <item.icon className="h-4 w-4" />
+              {item.label}
+            </Link>
           )
         )}
-      </SidebarMenu>
-    </SidebarContent>
+      </nav>
   );
 }
