@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, PlusCircle, Trash2 } from 'lucide-react';
+import { CalendarIcon, PlusCircle, Trash2, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   Form,
@@ -131,6 +131,20 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
       setNewColumnName('');
       setIsColumnDialogOpen(false);
     }
+  };
+
+  const handleRemoveColumn = (columnNameToRemove: string) => {
+    // Remove the column from the customColumns array
+    const newCustomColumns = customColumns.filter(col => col !== columnNameToRemove);
+    setValue('customColumns', newCustomColumns);
+
+    // Remove the corresponding custom field from each item
+    const currentItems = getValues('items');
+    const updatedItems = currentItems.map(item => ({
+      ...item,
+      customFields: (item.customFields || []).filter(field => field.name !== columnNameToRemove)
+    }));
+    setValue('items', updatedItems);
   };
 
   const onSubmit = async (values: InvoiceFormData) => {
@@ -285,7 +299,22 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                                         <th className="px-2 py-2 text-left w-1/3">Description</th>
                                         <th className="px-2 py-2 text-left">Qty</th>
                                         <th className="px-2 py-2 text-left">Price</th>
-                                        {customColumns.map(col => <th key={col} className="px-2 py-2 text-left">{col}</th>)}
+                                        {customColumns.map(col => (
+                                            <th key={col} className="px-2 py-2 text-left">
+                                                <div className="flex items-center gap-1">
+                                                    {col}
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-5 w-5 text-destructive/70 hover:text-destructive"
+                                                        onClick={() => handleRemoveColumn(col)}
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </th>
+                                        ))}
                                         <th className="px-2 py-2 text-right">Total</th>
                                         <th className="px-2 py-2 text-right">Actions</th>
                                     </tr>
