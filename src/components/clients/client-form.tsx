@@ -57,15 +57,23 @@ export default function ClientForm({ isOpen, onClose, client }: ClientFormProps)
     }
   }, [client, form, isOpen]);
 
-  const onSubmit = (values: ClientFormData) => {
-    if (client) {
-      updateClient(client.id, values);
-      toast({ title: 'Client updated successfully' });
-    } else {
-      addClient(values);
-      toast({ title: 'Client added successfully' });
+  const onSubmit = async (values: ClientFormData) => {
+    try {
+      if (client) {
+        await updateClient(client.id, values);
+        toast({ title: 'Client updated successfully' });
+      } else {
+        await addClient(values);
+        toast({ title: 'Client added successfully' });
+      }
+      onClose();
+    } catch (error) {
+      // Errors are now thrown and will be caught here.
+      // The FirestorePermissionError is already emitted, so we don't need to toast it.
+      console.error("Failed to save client:", error);
+      // Optionally, you could show a generic failure toast if it's not a permission error
+      // but for now, we'll let the permission error be the main feedback.
     }
-    onClose();
   };
 
   return (

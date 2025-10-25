@@ -22,7 +22,8 @@ function getClientsCollection() {
 
 export function addClient(clientData: ClientFormData) {
   const clientsCollection = getClientsCollection();
-  addDoc(clientsCollection, {
+  // Return the promise
+  return addDoc(clientsCollection, {
     ...clientData,
     createdAt: serverTimestamp(),
   }).catch(error => {
@@ -32,6 +33,8 @@ export function addClient(clientData: ClientFormData) {
       requestResourceData: clientData,
     });
     errorEmitter.emit('permission-error', permissionError);
+    // Re-throw the original error to be caught by the calling function
+    throw error;
   });
 }
 
