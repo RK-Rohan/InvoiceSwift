@@ -45,7 +45,7 @@ export const companyProfileSchema = z.object({
   email: z.string().email('Invalid email address.'),
   phone: z.string().optional(),
   address: z.string().optional(),
-  logoUrl: z.string().url().optional(),
+  logoUrl: z.string().optional(),
 });
 
 export type LineItem = z.infer<typeof lineItemSchema>;

@@ -25,18 +25,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Upload, User as UserIcon } from 'lucide-react';
-import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { User as UserIcon } from 'lucide-react';
 import { Label } from '@/components/ui/label';
-import { type CompanyProfile } from '@/lib/types';
-
-const companyProfileSchema = z.object({
-  companyName: z.string().min(1, 'Company name is required.'),
-  email: z.string().email('Invalid email address.'),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  logoUrl: z.string().url().optional(),
-});
+import { type CompanyProfile, companyProfileSchema } from '@/lib/types';
 
 type CompanyProfileFormData = z.infer<typeof companyProfileSchema>;
 
@@ -69,25 +60,15 @@ export default function GeneralSettingsPage() {
     }
   }, [companyProfile, form]);
 
-  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !user) return;
-
-    const storage = getStorage();
-    const storageRef = ref(storage, `users/${user.uid}/logos/${file.name}`);
+    if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const dataUrl = e.target?.result as string;
-        await uploadString(storageRef, dataUrl, 'data_url');
-        const downloadUrl = await getDownloadURL(storageRef);
-        form.setValue('logoUrl', downloadUrl);
-        toast({ title: 'Logo uploaded successfully.' });
-      } catch (error) {
-        console.error('Logo upload failed:', error);
-        toast({ variant: 'destructive', title: 'Logo upload failed.' });
-      }
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      form.setValue('logoUrl', dataUrl);
+      toast({ title: 'Logo ready to be saved.' });
     };
     reader.readAsDataURL(file);
   };
