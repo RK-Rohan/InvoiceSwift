@@ -1,15 +1,6 @@
 'use client';
 
 import {
-  SidebarContent,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
-} from '@/components/ui/sidebar';
-import {
   FileText,
   Users,
   Settings,
@@ -52,8 +43,7 @@ export default function SidebarNav() {
     <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
         {menuItems.map((item) =>
           item.children ? (
-            <Collapsible key={item.label} asChild open={openSettings} onOpenChange={setOpenSettings}>
-              <>
+            <Collapsible key={item.label} open={openSettings} onOpenChange={setOpenSettings} className="w-full">
                 <CollapsibleTrigger
                   className={cn(
                     'flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary w-full',
@@ -85,7 +75,6 @@ export default function SidebarNav() {
                     ))}
                   </div>
                 </CollapsibleContent>
-              </>
             </Collapsible>
           ) : (
             <Link
