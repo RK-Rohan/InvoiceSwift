@@ -1,16 +1,10 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useRouter } from 'next/navigation';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -38,15 +32,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../ui/card';
 
 type InvoiceFormProps = {
-  isOpen: boolean;
-  onClose: () => void;
   invoice: InvoiceWithId | null;
 };
 
-export default function InvoiceForm({ isOpen, onClose, invoice }: InvoiceFormProps) {
+export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   const { toast } = useToast();
+  const router = useRouter();
   const firestore = useFirestore();
   const { user } = useUser();
 
@@ -78,27 +72,25 @@ export default function InvoiceForm({ isOpen, onClose, invoice }: InvoiceFormPro
   const subtotal = watchedItems.reduce((acc, item) => acc + (item.quantity || 0) * (item.unitPrice || 0), 0);
 
   useEffect(() => {
-    if (isOpen) {
-        if (invoice) {
-          form.reset({
-            ...invoice,
-            issueDate: new Date(invoice.issueDate),
-            dueDate: new Date(invoice.dueDate),
-            items: invoice.items.map(item => ({...item}))
-          });
-        } else {
-          form.reset({
-            clientId: '',
-            clientName: '',
-            invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
-            issueDate: new Date(),
-            dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
-            items: [{ description: '', quantity: 1, unitPrice: 0 }],
-            notes: 'Thank you for your business.',
-          });
-        }
+    if (invoice) {
+      form.reset({
+        ...invoice,
+        issueDate: new Date(invoice.issueDate),
+        dueDate: new Date(invoice.dueDate),
+        items: invoice.items.map(item => ({...item}))
+      });
+    } else {
+      form.reset({
+        clientId: '',
+        clientName: '',
+        invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
+        issueDate: new Date(),
+        dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
+        items: [{ description: '', quantity: 1, unitPrice: 0 }],
+        notes: 'Thank you for your business.',
+      });
     }
-  }, [invoice, form, isOpen]);
+  }, [invoice, form]);
 
   const onSubmit = async (values: InvoiceFormData) => {
     try {
@@ -113,7 +105,7 @@ export default function InvoiceForm({ isOpen, onClose, invoice }: InvoiceFormPro
         await addInvoice(invoiceData);
         toast({ title: 'Invoice added successfully' });
       }
-      onClose();
+      router.push('/invoices');
     } catch (error: any) {
       if (error.name !== 'FirebaseError') {
         console.error("Failed to save invoice:", error);
@@ -127,13 +119,13 @@ export default function InvoiceForm({ isOpen, onClose, invoice }: InvoiceFormPro
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>{invoice ? 'Edit Invoice' : 'Create New Invoice'}</DialogTitle>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 max-h-[80vh] overflow-y-auto p-2">
+    <Card>
+      <CardHeader>
+        <CardTitle>{invoice ? 'Edit Invoice' : 'Create New Invoice'}</CardTitle>
+      </CardHeader>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <FormField
                 control={form.control}
@@ -331,18 +323,17 @@ export default function InvoiceForm({ isOpen, onClose, invoice }: InvoiceFormPro
             <div className="text-right font-bold text-lg">
                 Total: {formatCurrency(subtotal)}
             </div>
-
-            <DialogFooter>
-              <Button type="button" variant="ghost" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={form.formState.isSubmitting}>
-                {invoice ? 'Save Changes' : 'Create Invoice'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+          </CardContent>
+          <CardFooter className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => router.push('/invoices')}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={form.formState.isSubmitting}>
+              {invoice ? 'Save Changes' : 'Create Invoice'}
+            </Button>
+          </CardFooter>
+        </form>
+      </Form>
+    </Card>
   );
 }

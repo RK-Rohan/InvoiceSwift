@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useCollection, useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
@@ -11,11 +11,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import InvoiceForm from '@/components/invoice/invoice-form';
 import DeleteInvoiceDialog from '@/components/invoice/delete-invoice-dialog';
+import Link from 'next/link';
 
 export default function InvoicesPage() {
-  const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceWithId | null>(null);
 
@@ -38,24 +37,9 @@ export default function InvoicesPage() {
     error,
   } = useCollection<InvoiceWithId>(invoicesQuery);
 
-  const handleAddInvoice = () => {
-    setSelectedInvoice(null);
-    setIsFormOpen(true);
-  };
-
-  const handleEditInvoice = (invoice: InvoiceWithId) => {
-    setSelectedInvoice(invoice);
-    setIsFormOpen(true);
-  };
-
   const handleDeleteInvoice = (invoice: InvoiceWithId) => {
     setSelectedInvoice(invoice);
     setIsDeleteDialogOpen(true);
-  };
-
-  const closeForm = () => {
-    setIsFormOpen(false);
-    setSelectedInvoice(null);
   };
 
   const closeDeleteDialog = () => {
@@ -75,9 +59,11 @@ export default function InvoicesPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Invoices</CardTitle>
-          <Button onClick={handleAddInvoice} size="sm">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            New Invoice
+          <Button asChild size="sm">
+            <Link href="/invoices/new">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              New Invoice
+            </Link>
           </Button>
         </CardHeader>
         <CardContent>
@@ -107,12 +93,10 @@ export default function InvoicesPage() {
                       <TableCell>{formatCurrency(invoice.totalAmount)}</TableCell>
                       <TableCell>{getStatus(invoice)}</TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditInvoice(invoice)}
-                        >
-                          <Edit className="h-4 w-4" />
+                        <Button asChild variant="ghost" size="icon">
+                          <Link href={`/invoices/${invoice.id}/edit`}>
+                            <Edit className="h-4 w-4" />
+                          </Link>
                         </Button>
                         <Button
                           variant="ghost"
@@ -137,12 +121,6 @@ export default function InvoicesPage() {
           )}
         </CardContent>
       </Card>
-
-      <InvoiceForm
-        isOpen={isFormOpen}
-        onClose={closeForm}
-        invoice={selectedInvoice}
-      />
       
       {selectedInvoice && (
         <DeleteInvoiceDialog
