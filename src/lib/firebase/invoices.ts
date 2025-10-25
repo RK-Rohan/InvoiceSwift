@@ -41,9 +41,13 @@ export function addInvoice(invoiceData: InvoiceFormData) {
     ...invoiceData,
     issueDate: format(invoiceData.issueDate, 'yyyy-MM-dd'),
     dueDate: format(invoiceData.dueDate, 'yyyy-MM-dd'),
-    totalAmount: invoiceData.items.reduce((acc, item) => acc + item.quantity * item.unitPrice, 0),
+    totalAmount: invoiceData.items.reduce((acc, item) => acc + (item.quantity || 0) * (item.unitPrice || 0), 0),
     createdAt: serverTimestamp(),
     customColumns: invoiceData.customColumns || [],
+    items: (invoiceData.items || []).map(item => ({
+      ...item,
+      customFields: item.customFields || [],
+    })),
   };
 
   return addDoc(invoicesCollection, data).catch(error => {
@@ -59,13 +63,17 @@ export function addInvoice(invoiceData: InvoiceFormData) {
 
 export function updateInvoice(invoiceId: string, invoiceData: Partial<InvoiceFormData>) {
   const invoiceDoc = doc(getInvoicesCollection(), invoiceId);
-  const data = {
+  const data: Partial<Invoice & { updatedAt: any }> = {
     ...invoiceData,
     ...(invoiceData.issueDate && { issueDate: format(new Date(invoiceData.issueDate), 'yyyy-MM-dd') }),
     ...(invoiceData.dueDate && { dueDate: format(new Date(invoiceData.dueDate), 'yyyy-MM-dd') }),
-    totalAmount: invoiceData.items?.reduce((acc, item) => acc + item.quantity * item.unitPrice, 0),
+    totalAmount: invoiceData.items?.reduce((acc, item) => acc + (item.quantity || 0) * (item.unitPrice || 0), 0),
     updatedAt: serverTimestamp(),
     customColumns: invoiceData.customColumns || [],
+    items: (invoiceData.items || []).map(item => ({
+      ...item,
+      customFields: item.customFields || [],
+    })),
   };
 
   updateDocumentNonBlocking(invoiceDoc, data);
@@ -75,3 +83,5 @@ export function deleteInvoice(invoiceId: string) {
   const invoiceDoc = doc(getInvoicesCollection(), invoiceId);
   deleteDocumentNonBlocking(invoiceDoc);
 }
+
+    

@@ -44,6 +44,8 @@ import {
 } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../ui/card';
 import InvoicePreview from './invoice-preview';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Label } from '../ui/label';
 
 type InvoiceFormProps = {
   invoice?: InvoiceWithId | null;
@@ -57,6 +59,9 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   const [generatedHtml, setGeneratedHtml] = useState<string | null>(null);
   const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
+  const [newColumnPosition, setNewColumnPosition] = useState<'before' | 'after'>('after');
+  const [referenceColumn, setReferenceColumn] = useState<string>('');
+
 
   const clientsCollection = useMemoFirebase(
     () => (user && firestore ? collection(firestore, 'users', user.uid, 'clients') : null),
@@ -91,6 +96,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   
   const watchedItems = watch('items');
   const customColumns = watch('customColumns') || [];
+  const allColumns = ['Description', 'Qty', 'Price', ...customColumns];
   const subtotal = watchedItems.reduce((acc, item) => acc + (item.quantity || 0) * (item.unitPrice || 0), 0);
 
   useEffect(() => {
@@ -116,19 +122,52 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
     }
   }, [invoice, reset]);
 
+   useEffect(() => {
+    if (isColumnDialogOpen) {
+      setReferenceColumn(allColumns[allColumns.length - 1]);
+    }
+  }, [isColumnDialogOpen]);
+
   const handleAddColumn = () => {
     if (newColumnName && !customColumns.includes(newColumnName)) {
-      const newCustomColumns = [...customColumns, newColumnName];
+      const currentCustomColumns = getValues('customColumns') || [];
+      let insertIndex = currentCustomColumns.length;
+
+      if (referenceColumn) {
+        const refColIndex = allColumns.indexOf(referenceColumn);
+        const customColOffset = 3; // Number of default columns
+        const customRefIndex = currentCustomColumns.indexOf(referenceColumn);
+
+        if (newColumnPosition === 'before') {
+           if (refColIndex < customColOffset) {
+             insertIndex = 0;
+           } else {
+             insertIndex = customRefIndex;
+           }
+        } else { // 'after'
+            if (refColIndex < customColOffset) {
+                insertIndex = 0;
+            } else {
+                insertIndex = customRefIndex + 1;
+            }
+        }
+      }
+
+      const newCustomColumns = [...currentCustomColumns];
+      newCustomColumns.splice(insertIndex, 0, newColumnName);
       setValue('customColumns', newCustomColumns);
 
       const currentItems = getValues('items');
-      const updatedItems = currentItems.map(item => ({
-        ...item,
-        customFields: [...(item.customFields || []), { name: newColumnName, value: '' }]
-      }));
+      const updatedItems = currentItems.map(item => {
+          const newCustomFields = [...(item.customFields || [])];
+          newCustomFields.splice(insertIndex, 0, { name: newColumnName, value: '' });
+          return { ...item, customFields: newCustomFields };
+      });
       setValue('items', updatedItems);
 
       setNewColumnName('');
+      setReferenceColumn('');
+      setNewColumnPosition('after');
       setIsColumnDialogOpen(false);
     }
   };
@@ -343,33 +382,26 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                                         render={({ field }) => ( <FormItem><FormControl><Input type="number" placeholder="Price" {...field} /></FormControl><FormMessage /></FormItem> )}
                                     />
                                     </td>
-                                    {customColumns.map(colName => (
-                                        <td key={colName}>
-                                            <FormField
-                                                control={control}
-                                                name={`items.${index}.customFields`}
-                                                render={({ field }) => {
-                                                    const value = field.value?.find(cf => cf.name === colName)?.value || '';
-                                                    return (
-                                                        <Input
-                                                            placeholder={colName}
-                                                            defaultValue={value}
-                                                            onChange={(e) => {
-                                                                const newCustomFields = [...(field.value || [])];
-                                                                const existingFieldIndex = newCustomFields.findIndex(cf => cf.name === colName);
-                                                                if (existingFieldIndex > -1) {
-                                                                    newCustomFields[existingFieldIndex].value = e.target.value;
-                                                                } else {
-                                                                    newCustomFields.push({ name: colName, value: e.target.value });
-                                                                }
-                                                                setValue(`items.${index}.customFields`, newCustomFields);
-                                                            }}
-                                                        />
-                                                    )
-                                                }}
-                                            />
-                                        </td>
-                                    ))}
+                                    {customColumns.map((colName, colIndex) => {
+                                        // Find the index of the custom field for the current column
+                                        const customFieldIndex = (getValues(`items.${index}.customFields`) || []).findIndex(cf => cf.name === colName);
+                                        const fieldName = `items.${index}.customFields.${customFieldIndex}.value`;
+                                        
+                                        return (
+                                            <td key={colName}>
+                                                <FormField
+                                                    control={control}
+                                                    name={`items.${index}.customFields`}
+                                                    render={() => (
+                                                      <Input
+                                                          placeholder={colName}
+                                                          {...methods.register(fieldName as any)}
+                                                      />
+                                                    )}
+                                                />
+                                            </td>
+                                        )
+                                    })}
                                     <td className="text-right py-2 font-medium align-top">
                                         {formatCurrency((watchedItems[index]?.quantity || 0) * (watchedItems[index]?.unitPrice || 0))}
                                     </td>
@@ -416,15 +448,49 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                                         <DialogTitle>Add Custom Column</DialogTitle>
                                     </DialogHeader>
                                     <div className="grid gap-4 py-4">
-                                        <Input 
-                                            placeholder="Column Name (e.g. Discount)"
-                                            value={newColumnName}
-                                            onChange={(e) => setNewColumnName(e.target.value)}
-                                        />
+                                        <div className="space-y-2">
+                                            <Label htmlFor="new-column-name">Column Name</Label>
+                                            <Input 
+                                                id="new-column-name"
+                                                placeholder="e.g. Discount"
+                                                value={newColumnName}
+                                                onChange={(e) => setNewColumnName(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Position</Label>
+                                            <RadioGroup 
+                                              value={newColumnPosition} 
+                                              onValueChange={(value: 'before' | 'after') => setNewColumnPosition(value)} 
+                                              className="flex space-x-4"
+                                            >
+                                                <div className="flex items-center space-x-2">
+                                                    <RadioGroupItem value="before" id="pos-before" />
+                                                    <Label htmlFor="pos-before">Before</Label>
+                                                </div>
+                                                <div className="flex items-center space-x-2">
+                                                    <RadioGroupItem value="after" id="pos-after" />
+                                                    <Label htmlFor="pos-after">After</Label>
+                                                </div>
+                                            </RadioGroup>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="reference-column">Reference Column</Label>
+                                              <Select onValueChange={setReferenceColumn} value={referenceColumn}>
+                                                  <SelectTrigger id="reference-column">
+                                                      <SelectValue placeholder="Select a column" />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                      {allColumns.map(col => (
+                                                          <SelectItem key={col} value={col}>{col}</SelectItem>
+                                                      ))}
+                                                  </SelectContent>
+                                              </Select>
+                                        </div>
                                     </div>
                                     <DialogFooter>
                                         <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                                        <Button type="button" onClick={handleAddColumn}>Add Column</Button>
+                                        <Button type="button" onClick={handleAddColumn} disabled={!newColumnName || !referenceColumn}>Add Column</Button>
                                     </DialogFooter>
                                 </DialogContent>
                             </Dialog>
@@ -465,3 +531,5 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
     </FormProvider>
   );
 }
+
+    
