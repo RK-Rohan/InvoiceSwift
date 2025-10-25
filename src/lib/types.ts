@@ -40,8 +40,17 @@ export const customizationSchema = z.object({
   companyLogo: z.any().optional(),
 });
 
+export const companyProfileSchema = z.object({
+  companyName: z.string().min(1, 'Company name is required.'),
+  email: z.string().email('Invalid email address.'),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  logoUrl: z.string().url().optional(),
+});
+
 export type LineItem = z.infer<typeof lineItemSchema>;
 export type Client = z.infer<typeof clientSchema>;
 export type ClientFormData = z.infer<typeof clientFormSchema>;
 export type Invoice = z.infer<typeof invoiceSchema>;
 export type CustomizationData = z.infer<typeof customizationSchema>;
+export type CompanyProfile = z.infer<typeof companyProfileSchema>;

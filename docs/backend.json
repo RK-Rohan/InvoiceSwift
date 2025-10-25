@@ -121,6 +121,40 @@
         "quantity",
         "unitPrice"
       ]
+    },
+    "CompanyProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "CompanyProfile",
+      "type": "object",
+      "description": "Stores the user's company profile information.",
+      "properties": {
+        "companyName": {
+          "type": "string",
+          "description": "The name of the user's company."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The contact email for the company."
+        },
+        "phone": {
+          "type": "string",
+          "description": "The contact phone number for the company."
+        },
+        "address": {
+          "type": "string",
+          "description": "The physical address of the company."
+        },
+        "logoUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL of the company logo."
+        }
+      },
+      "required": [
+        "companyName",
+        "email"
+      ]
     }
   },
   "auth": {
@@ -138,7 +172,7 @@
           "schema": {
             "$ref": "#/backend/entities/Client"
           },
-          "description": "Stores client data specific to a user.  Path-based ownership ensures only the user with ID {userId} can access these clients.",
+          "description": "Stores client data specific to a user. Path-based ownership ensures only the user with ID {userId} can access these clients.",
           "params": [
             {
               "name": "userId",
@@ -199,6 +233,22 @@
             {
               "name": "invoiceItemId",
               "description": "The unique identifier of the invoice item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/companyProfile/profile",
+        "definition": {
+          "entityName": "CompanyProfile",
+          "schema": {
+            "$ref": "#/backend/entities/CompanyProfile"
+          },
+          "description": "Stores the company profile for a user. There is only one profile document per user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
             }
           ]
         }
