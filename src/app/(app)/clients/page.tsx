@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useCollection, useUser, useFirestore } from '@/firebase';
+import { useMemo } from 'react';
+import { useCollection, useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,8 +19,10 @@ export default function ClientsPage() {
   const firestore = useFirestore();
   const { user } = useUser();
 
-  const clientsCollection =
-    user && firestore ? collection(firestore, 'users', user.uid, 'clients') : null;
+  const clientsCollection = useMemoFirebase(
+    () => (user && firestore ? collection(firestore, 'users', user.uid, 'clients') : null),
+    [user, firestore]
+  );
 
   const {
     data: clients,
