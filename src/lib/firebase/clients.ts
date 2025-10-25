@@ -33,7 +33,7 @@ export function addClient(clientData: ClientFormData) {
       requestResourceData: clientData,
     });
     errorEmitter.emit('permission-error', permissionError);
-    // Re-throw the original error to be caught by the calling function
+    // Re-throw the original error to be caught by the calling function's catch block
     throw error;
   });
 }
