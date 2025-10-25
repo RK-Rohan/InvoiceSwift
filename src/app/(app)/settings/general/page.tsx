@@ -27,6 +27,7 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Upload, User as UserIcon } from 'lucide-react';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { Label } from '@/components/ui/label';
 
 const companyProfileSchema = z.object({
   companyName: z.string().min(1, 'Company name is required.'),
