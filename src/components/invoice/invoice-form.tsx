@@ -47,16 +47,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../ui/card
 import InvoicePreview from './invoice-preview';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Label } from '../ui/label';
+import { Skeleton } from '../ui/skeleton';
 
 type InvoiceFormProps = {
-  invoice?: InvoiceWithId | null;
+  params?: { id: string };
 };
 
-export default function InvoiceForm({ invoice }: InvoiceFormProps) {
+export default function InvoiceForm({ params }: InvoiceFormProps) {
   const { toast } = useToast();
   const router = useRouter();
   const firestore = useFirestore();
   const { user } = useUser();
+  const [invoiceId, setInvoiceId] = useState<string | undefined>(undefined);
   const [generatedHtml, setGeneratedHtml] = useState<string | null>(null);
   const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
@@ -64,6 +66,24 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   const [newColumnPosition, setNewColumnPosition] = useState<'before' | 'after'>('after');
   const [referenceColumn, setReferenceColumn] = useState<string>('');
   const [showQtyInPreview, setShowQtyInPreview] = useState(true);
+
+  // Handle resolving params promise
+  useEffect(() => {
+    const resolveParams = async () => {
+      if (params?.id) {
+        const id = await params.id;
+        setInvoiceId(id);
+      }
+    };
+    resolveParams();
+  }, [params]);
+
+
+  const invoiceRef = useMemoFirebase(
+    () => (invoiceId && user && firestore ? doc(firestore, 'users', user.uid, 'invoices', invoiceId) : null),
+    [invoiceId, user, firestore]
+  );
+  const { data: invoice, isLoading: isInvoiceLoading } = useDoc<InvoiceWithId>(invoiceRef);
 
 
   const clientsCollection = useMemoFirebase(
@@ -97,7 +117,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
 
   const methods = useForm<InvoiceFormData>({
     resolver: zodResolver(invoiceFormSchema),
-    defaultValues: invoice ? undefined : defaultInvoiceValues,
+    defaultValues: defaultInvoiceValues,
   });
 
   const { control, formState, watch, reset, handleSubmit, setValue, getValues } = methods;
@@ -114,6 +134,24 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   const totalPaid = watch('totalPaid') || 0;
   
   const allColumns = useMemo(() => ['Description', 'Qty', 'Price', ...customColumns.map(c => c.name)], [customColumns]);
+
+  useEffect(() => {
+    if (invoice && !isInvoiceLoading) {
+      const invoiceData = {
+        ...invoice,
+        issueDate: invoice.issueDate ? new Date(invoice.issueDate) : new Date(),
+        dueDate: invoice.dueDate ? new Date(invoice.dueDate) : new Date(),
+        items: (invoice.items || []).map(item => ({...item, customFields: item.customFields || [] })),
+        customColumns: invoice.customColumns || [],
+        currency: invoice.currency || 'BDT',
+        discount: invoice.discount || 0,
+        totalPaid: invoice.totalPaid || 0,
+      };
+      reset(invoiceData);
+    } else if (!invoiceId && !isInvoiceLoading) {
+      reset(defaultInvoiceValues);
+    }
+  }, [invoice, isInvoiceLoading, invoiceId, reset]);
 
   const calculateLineItemTotal = (item: any) => {
     let total = (item.quantity || 0) * (item.unitPrice || 0);
@@ -134,23 +172,8 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
     if (!watchedItems) return 0;
     return watchedItems.reduce((acc, item) => acc + calculateLineItemTotal(item), 0)
   }, [watchedItems, customColumns]);
-  const amountDue = useMemo(() => subtotal - discount - totalPaid, [subtotal, discount, totalPaid]);
 
-  useEffect(() => {
-    if (invoice) {
-      const invoiceData = {
-        ...invoice,
-        issueDate: invoice.issueDate ? new Date(invoice.issueDate) : new Date(),
-        dueDate: invoice.dueDate ? new Date(invoice.dueDate) : new Date(),
-        items: (invoice.items || []).map(item => ({...item, customFields: item.customFields || [] })),
-        customColumns: invoice.customColumns || [],
-        currency: invoice.currency || 'BDT',
-        discount: invoice.discount || 0,
-        totalPaid: invoice.totalPaid || 0,
-      };
-      reset(invoiceData);
-    }
-  }, [invoice, reset]);
+  const amountDue = useMemo(() => subtotal - discount - totalPaid, [subtotal, discount, totalPaid]);
 
    useEffect(() => {
     if (isColumnDialogOpen) {
@@ -228,10 +251,10 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
 
   const onSubmit = async (values: InvoiceFormData) => {
     try {
-        const totalAmount = calculateLineItemTotal(values);
+        const totalAmount = amountDue; // Use the calculated amountDue
         const invoiceData = {
             ...values,
-            totalAmount: amountDue,
+            totalAmount: totalAmount,
             items: values.items.map(item => ({
               ...item,
               customFields: (item.customFields || []).map(cf => ({...cf}))
@@ -256,6 +279,19 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
       }
     }
   };
+
+  if (isInvoiceLoading && invoiceId) {
+    return (
+        <div className="space-y-8">
+            <Skeleton className="h-[600px] w-full" />
+            <Skeleton className="h-[70vh] w-full" />
+        </div>
+    );
+  }
+
+  if (invoiceId && !invoice && !isInvoiceLoading) {
+    return <p>Invoice not found.</p>;
+  }
 
   return (
     <FormProvider {...methods}>
