@@ -58,7 +58,7 @@ export function addInvoice(invoiceData: InvoiceFormData) {
   const invoicesCollection = getInvoicesCollection();
   
   const subtotal = calculateSubtotal(invoiceData);
-  const totalAmount = subtotal - (invoiceData.discount || 0) - (invoiceData.totalPaid || 0);
+  const totalAmount = subtotal - (invoiceData.discount || 0);
 
   const data = {
     ...invoiceData,
@@ -89,7 +89,7 @@ export function updateInvoice(invoiceId: string, invoiceData: Partial<InvoiceFor
   const invoiceDoc = doc(getInvoicesCollection(), invoiceId);
   
   const subtotal = calculateSubtotal(invoiceData);
-  const totalAmount = subtotal - (invoiceData.discount || 0) - (invoiceData.totalPaid || 0);
+  const totalAmount = subtotal - (invoiceData.discount || 0);
 
 
   const data: Partial<Invoice & { updatedAt: any }> = {

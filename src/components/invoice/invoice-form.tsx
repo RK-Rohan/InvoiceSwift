@@ -256,10 +256,8 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
 
   const onSubmit = async (values: InvoiceFormData) => {
     try {
-        const totalAmount = amountDue; // Use the calculated amountDue
         const invoiceData = {
             ...values,
-            totalAmount: totalAmount,
             items: values.items.map(item => ({
               ...item,
               customFields: (item.customFields || []).map(cf => ({...cf}))
