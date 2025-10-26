@@ -77,6 +77,10 @@
 }
 
 @media print {
+  body, html {
+    height: auto;
+    overflow: visible;
+  }
   body * {
     visibility: hidden;
   }
@@ -89,8 +93,11 @@
     left: 0;
     top: 0;
     width: 100%;
-    height: auto;
-    overflow: visible;
+    height: auto !important;
+    overflow: visible !important;
+    background: white; /* Ensure a clean background */
+    -webkit-print-color-adjust: exact; /* For Chrome/Safari */
+    color-adjust: exact; /* Standard */
   }
   .no-print {
     display: none !important;
