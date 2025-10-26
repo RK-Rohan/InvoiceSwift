@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -419,7 +420,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                                       )
                                     })}
                                     <td className="text-right py-2 font-medium align-top">
-                                        {formatCurrency(calculateLineItemTotal(watchedItems[index]))}
+                                        {formatCurrency(calculateLineItemTotal(watchedItems[index]), companyProfile?.currency)}
                                     </td>
                                     <td className='align-top'>
                                     <Button
@@ -551,7 +552,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                         />
                         
                         <div className="text-right font-bold text-lg">
-                            Total: {formatCurrency(subtotal)}
+                            Total: {formatCurrency(subtotal, companyProfile?.currency)}
                         </div>
                     </CardContent>
                     <CardFooter className="flex justify-end gap-2">

@@ -101,13 +101,13 @@ export default function InvoicePreview({ generatedHtml, companyProfile }: Invoic
             <TableRow key={index}>
               <TableCell className="font-medium">{item.description}</TableCell>
               <TableCell className="text-center">{item.quantity}</TableCell>
-              <TableCell className="text-right">{formatCurrency(item.unitPrice || 0)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(item.unitPrice || 0, companyProfile?.currency)}</TableCell>
               {customColumns.map(col => (
                   <TableCell key={col.name} className="text-right">
                       {item.customFields?.find(cf => cf.name === col.name)?.value || '-'}
                   </TableCell>
               ))}
-              <TableCell className="text-right">{formatCurrency(calculateLineItemTotal(item))}</TableCell>
+              <TableCell className="text-right">{formatCurrency(calculateLineItemTotal(item), companyProfile?.currency)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -116,7 +116,7 @@ export default function InvoicePreview({ generatedHtml, companyProfile }: Invoic
         <div className="w-full max-w-xs space-y-2">
           <div className="flex justify-between font-bold text-lg border-t pt-2">
             <span>Total</span>
-            <span>{formatCurrency(subtotal)}</span>
+            <span>{formatCurrency(subtotal, companyProfile?.currency)}</span>
           </div>
         </div>
       </div>

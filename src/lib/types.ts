@@ -71,6 +71,7 @@ export const companyProfileSchema = z.object({
   phone: z.string().optional(),
   address: z.string().optional(),
   logoUrl: z.string().optional(),
+  currency: z.string().optional().default('USD'),
 });
 
 export type LineItem = z.infer<typeof lineItemSchema>;

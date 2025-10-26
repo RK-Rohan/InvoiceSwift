@@ -1,12 +1,13 @@
+
 'use client';
 
 import { useState } from 'react';
-import { useCollection, useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { useCollection, useUser, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
+import { collection, query, orderBy, doc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PlusCircle, Edit, Trash2 } from 'lucide-react';
-import { type InvoiceWithId } from '@/lib/types';
+import { type InvoiceWithId, type CompanyProfile } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
@@ -36,6 +37,12 @@ export default function InvoicesPage() {
     isLoading,
     error,
   } = useCollection<InvoiceWithId>(invoicesQuery);
+
+  const companyProfileRef = useMemoFirebase(
+    () => (user && firestore ? doc(firestore, 'users', user.uid, 'companyProfile', 'profile') : null),
+    [user, firestore]
+  );
+  const { data: companyProfile } = useDoc<CompanyProfile>(companyProfileRef);
 
   const handleDeleteInvoice = (invoice: InvoiceWithId) => {
     setSelectedInvoice(invoice);
@@ -90,7 +97,7 @@ export default function InvoicesPage() {
                       <TableCell>{invoice.clientName}</TableCell>
                       <TableCell>{invoice.issueDate ? format(new Date(invoice.issueDate), 'PPP') : ''}</TableCell>
                       <TableCell>{invoice.dueDate ? format(new Date(invoice.dueDate), 'PPP') : ''}</TableCell>
-                      <TableCell>{formatCurrency(invoice.totalAmount)}</TableCell>
+                      <TableCell>{formatCurrency(invoice.totalAmount, companyProfile?.currency)}</TableCell>
                       <TableCell>{getStatus(invoice)}</TableCell>
                       <TableCell className="text-right">
                         <Button asChild variant="ghost" size="icon">
