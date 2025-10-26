@@ -35,15 +35,12 @@ function getInvoiceItemsCollection(invoiceId: string) {
     return collection(firestore, 'users', user.uid, 'invoices', invoiceId, 'items');
 }
 
-export function addInvoice(invoiceData: InvoiceFormData) {
-  const invoicesCollection = getInvoicesCollection();
-  const data = {
-    ...invoiceData,
-    issueDate: format(invoiceData.issueDate, 'yyyy-MM-dd'),
-    dueDate: format(invoiceData.dueDate, 'yyyy-MM-dd'),
-    totalAmount: invoiceData.items.reduce((acc, item) => {
-      let itemTotal = (item.quantity || 0) * (item.unitPrice || 0);
-      item.customFields?.forEach(field => {
+const calculateTotalAmount = (invoiceData: Partial<InvoiceFormData>): number => {
+  if (!invoiceData.items) return 0;
+  return invoiceData.items.reduce((acc, item) => {
+    let itemTotal = (item.quantity || 0) * (item.unitPrice || 0);
+    if (item.customFields && invoiceData.customColumns) {
+      item.customFields.forEach(field => {
         const column = invoiceData.customColumns?.find(c => c.name === field.name);
         const value = parseFloat(field.value) || 0;
         if (column?.type === 'subtractive') {
@@ -52,8 +49,21 @@ export function addInvoice(invoiceData: InvoiceFormData) {
           itemTotal += value;
         }
       });
-      return acc + itemTotal;
-    }, 0),
+    }
+    return acc + itemTotal;
+  }, 0);
+};
+
+export function addInvoice(invoiceData: InvoiceFormData) {
+  const invoicesCollection = getInvoicesCollection();
+  
+  const totalAmount = calculateTotalAmount(invoiceData);
+
+  const data = {
+    ...invoiceData,
+    issueDate: format(invoiceData.issueDate, 'yyyy-MM-dd'),
+    dueDate: format(invoiceData.dueDate, 'yyyy-MM-dd'),
+    totalAmount: totalAmount,
     createdAt: serverTimestamp(),
     customColumns: invoiceData.customColumns || [],
     items: (invoiceData.items || []).map(item => ({
@@ -76,19 +86,7 @@ export function addInvoice(invoiceData: InvoiceFormData) {
 export function updateInvoice(invoiceId: string, invoiceData: Partial<InvoiceFormData>) {
   const invoiceDoc = doc(getInvoicesCollection(), invoiceId);
   
-  const totalAmount = invoiceData.items?.reduce((acc, item) => {
-      let itemTotal = (item.quantity || 0) * (item.unitPrice || 0);
-      item.customFields?.forEach(field => {
-        const column = invoiceData.customColumns?.find(c => c.name === field.name);
-        const value = parseFloat(field.value) || 0;
-        if (column?.type === 'subtractive') {
-          itemTotal -= value;
-        } else if (column?.type === 'additive') {
-          itemTotal += value;
-        }
-      });
-      return acc + itemTotal;
-    }, 0);
+  const totalAmount = calculateTotalAmount(invoiceData);
 
   const data: Partial<Invoice & { updatedAt: any }> = {
     ...invoiceData,
