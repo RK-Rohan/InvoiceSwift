@@ -6,17 +6,20 @@ import { useCollection, useUser, useFirestore, useMemoFirebase, useDoc } from '@
 import { collection, query, orderBy, doc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { PlusCircle, Edit, Trash2, MoreHorizontal } from 'lucide-react';
 import { type InvoiceWithId, type CompanyProfile } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import DeleteInvoiceDialog from '@/components/invoice/delete-invoice-dialog';
+import AddPaymentDialog from '@/components/invoice/add-payment-dialog';
 import Link from 'next/link';
 
 export default function InvoicesPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceWithId | null>(null);
 
   const firestore = useFirestore();
@@ -44,15 +47,24 @@ export default function InvoicesPage() {
   );
   const { data: companyProfile } = useDoc<CompanyProfile>(companyProfileRef);
 
-  const handleDeleteInvoice = (invoice: InvoiceWithId) => {
+  const handleAction = (invoice: InvoiceWithId, action: 'edit' | 'delete' | 'payment') => {
     setSelectedInvoice(invoice);
-    setIsDeleteDialogOpen(true);
+    if (action === 'delete') {
+      setIsDeleteDialogOpen(true);
+    } else if (action === 'payment') {
+      setIsPaymentDialogOpen(true);
+    }
   };
 
   const closeDeleteDialog = () => {
     setIsDeleteDialogOpen(false);
     setSelectedInvoice(null);
   };
+  
+  const closePaymentDialog = () => {
+    setIsPaymentDialogOpen(false);
+    setSelectedInvoice(null);
+  }
 
   const getStatus = (invoice: InvoiceWithId) => {
     if (invoice.dueDate && new Date(invoice.dueDate) < new Date()) {
@@ -100,19 +112,27 @@ export default function InvoicesPage() {
                       <TableCell>{formatCurrency(invoice.totalAmount, invoice.currency)}</TableCell>
                       <TableCell>{getStatus(invoice)}</TableCell>
                       <TableCell className="text-right">
-                        <Button asChild variant="ghost" size="icon">
-                          <Link href={`/invoices/${invoice.id}/edit`}>
-                            <Edit className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => handleDeleteInvoice(invoice)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                               <Link href={`/invoices/${invoice.id}/edit`}>Edit</Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleAction(invoice, 'payment')}>
+                              Add Payment
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="text-destructive"
+                              onClick={() => handleAction(invoice, 'delete')}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))
@@ -133,6 +153,13 @@ export default function InvoicesPage() {
         <DeleteInvoiceDialog
           isOpen={isDeleteDialogOpen}
           onClose={closeDeleteDialog}
+          invoice={selectedInvoice}
+        />
+      )}
+      {selectedInvoice && (
+        <AddPaymentDialog
+          isOpen={isPaymentDialogOpen}
+          onClose={closePaymentDialog}
           invoice={selectedInvoice}
         />
       )}
