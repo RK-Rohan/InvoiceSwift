@@ -78,22 +78,26 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   );
   const { data: companyProfile } = useDoc<CompanyProfile>(companyProfileRef);
 
-  const methods = useForm<InvoiceFormData>({
-    resolver: zodResolver(invoiceFormSchema),
-    defaultValues: {
+  const defaultInvoiceValues: InvoiceFormData = {
       clientId: '',
       clientName: '',
       clientEmail: '',
       clientPhoneNumber: '',
       clientAddress: '',
-      invoiceNumber: '',
+      invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
+      issueDate: new Date(),
+      dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
       items: [{ description: '', quantity: 1, unitPrice: 0, customFields: [] }],
-      notes: '',
+      notes: 'Thank you for your business.',
       customColumns: [],
       currency: 'BDT',
       discount: 0,
       totalPaid: 0,
-    },
+  };
+
+  const methods = useForm<InvoiceFormData>({
+    resolver: zodResolver(invoiceFormSchema),
+    defaultValues: invoice ? undefined : defaultInvoiceValues,
   });
 
   const { control, formState, watch, reset, handleSubmit, setValue, getValues } = methods;
@@ -113,8 +117,9 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
 
   const calculateLineItemTotal = (item: any) => {
     let total = (item.quantity || 0) * (item.unitPrice || 0);
+    const formCustomColumns = getValues('customColumns') || [];
     item.customFields?.forEach((field: any) => {
-      const column = customColumns.find(c => c.name === field.name);
+      const column = formCustomColumns.find(c => c.name === field.name);
       const value = parseFloat(field.value) || 0;
       if (column?.type === 'subtractive') {
         total -= value;
@@ -125,7 +130,10 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
     return total;
   };
 
-  const subtotal = useMemo(() => watchedItems.reduce((acc, item) => acc + calculateLineItemTotal(item), 0), [watchedItems, customColumns]);
+  const subtotal = useMemo(() => {
+    if (!watchedItems) return 0;
+    return watchedItems.reduce((acc, item) => acc + calculateLineItemTotal(item), 0)
+  }, [watchedItems, customColumns]);
   const amountDue = useMemo(() => subtotal - discount - totalPaid, [subtotal, discount, totalPaid]);
 
   useEffect(() => {
@@ -134,30 +142,13 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
         ...invoice,
         issueDate: invoice.issueDate ? new Date(invoice.issueDate) : new Date(),
         dueDate: invoice.dueDate ? new Date(invoice.dueDate) : new Date(),
-        items: invoice.items.map(item => ({...item, customFields: item.customFields || [] })),
+        items: (invoice.items || []).map(item => ({...item, customFields: item.customFields || [] })),
         customColumns: invoice.customColumns || [],
         currency: invoice.currency || 'BDT',
         discount: invoice.discount || 0,
         totalPaid: invoice.totalPaid || 0,
       };
       reset(invoiceData);
-    } else {
-      reset({
-        clientId: '',
-        clientName: '',
-        clientEmail: '',
-        clientPhoneNumber: '',
-        clientAddress: '',
-        invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
-        issueDate: new Date(),
-        dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
-        items: [{ description: '', quantity: 1, unitPrice: 0, customFields: [] }],
-        notes: 'Thank you for your business.',
-        customColumns: [],
-        currency: 'BDT',
-        discount: 0,
-        totalPaid: 0,
-      });
     }
   }, [invoice, reset]);
 
@@ -176,15 +167,26 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
 
       if (referenceColumn) {
           const isDefaultColumn = ['Description', 'Qty', 'Price'].includes(referenceColumn);
-          const refIndex = isDefaultColumn 
-            ? allColumns.indexOf(referenceColumn)
-            : currentCustomColumns.findIndex(c => c.name === referenceColumn);
-
-          if (newColumnPosition === 'before') {
-              insertIndex = isDefaultColumn ? 0 : refIndex;
-          } else { // 'after'
-              insertIndex = isDefaultColumn ? refIndex - 2 : refIndex + 1;
+          const defaultCols = ['Description', 'Qty', 'Price'];
+          
+          if(isDefaultColumn) {
+            const refIndex = defaultCols.indexOf(referenceColumn);
+             if (newColumnPosition === 'before') {
+                // This is tricky because we can't actually insert before default columns.
+                // For simplicity, we'll treat 'before Description' as the first custom column.
+                insertIndex = 0;
+            } else { // 'after'
+                // This logic is also flawed. Let's simplify.
+                // Let's find index in all columns and place it relative to that.
+                const allColsRefIndex = allColumns.indexOf(referenceColumn);
+                insertIndex = allColsRefIndex - defaultCols.length + 1;
+            }
+          } else {
+             const refIndex = currentCustomColumns.findIndex(c => c.name === referenceColumn);
+             insertIndex = newColumnPosition === 'before' ? refIndex : refIndex + 1;
           }
+           if(insertIndex < 0) insertIndex = 0;
+
       }
 
 
@@ -209,27 +211,30 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   };
 
   const handleRemoveColumn = (columnNameToRemove: string) => {
-    // Remove the column from the customColumns array
-    const newCustomColumns = customColumns.filter(col => col.name !== columnNameToRemove);
+    const customColumnIndex = (getValues('customColumns') || []).findIndex(c => c.name === columnNameToRemove);
+    if(customColumnIndex === -1) return;
+
+    const newCustomColumns = (getValues('customColumns') || []).filter(col => col.name !== columnNameToRemove);
     setValue('customColumns', newCustomColumns);
 
-    // Remove the corresponding custom field from each item
     const currentItems = getValues('items');
-    const updatedItems = currentItems.map(item => ({
-      ...item,
-      customFields: (item.customFields || []).filter(field => field.name !== columnNameToRemove)
-    }));
+    const updatedItems = currentItems.map(item => {
+        const newCustomFields = [...(item.customFields || [])];
+        newCustomFields.splice(customColumnIndex, 1);
+        return { ...item, customFields: newCustomFields };
+    });
     setValue('items', updatedItems);
   };
 
   const onSubmit = async (values: InvoiceFormData) => {
     try {
+        const totalAmount = calculateLineItemTotal(values);
         const invoiceData = {
             ...values,
             totalAmount: amountDue,
             items: values.items.map(item => ({
               ...item,
-              customFields: (item.customFields || []).map(cf => ({...cf})) // Ensure it's a plain object
+              customFields: (item.customFields || []).map(cf => ({...cf}))
             }))
         }
       if (invoice) {
@@ -433,63 +438,64 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                {fields.map((field, index) => (
-                                <tr key={field.id} className="items-start">
-                                    <td>
-                                    <FormField
-                                        control={control}
-                                        name={`items.${index}.description`}
-                                        render={({ field }) => ( <FormItem><FormControl><Input placeholder="Item description" {...field} /></FormControl><FormMessage /></FormItem> )}
-                                    />
-                                    </td>
-                                    <td>
-                                    <FormField
-                                        control={control}
-                                        name={`items.${index}.quantity`}
-                                        render={({ field }) => ( <FormItem><FormControl><Input type="number" placeholder="Qty" {...field} /></FormControl><FormMessage /></FormItem> )}
-                                    />
-                                    </td>
-                                    <td>
-                                    <FormField
-                                        control={control}
-                                        name={`items.${index}.unitPrice`}
-                                        render={({ field }) => ( <FormItem><FormControl><Input type="number" placeholder="Price" {...field} /></FormControl><FormMessage /></FormItem> )}
-                                    />
-                                    </td>
-                                    {customColumns.map((col, colIndex) => {
-                                      const fieldName = `items.${index}.customFields.${colIndex}.value`;
-                                      return (
-                                        <td key={col.name}>
-                                            <FormField
-                                                control={control}
-                                                name={`items.${index}.customFields`}
-                                                render={() => (
-                                                    <Input
-                                                        placeholder={col.name}
-                                                        type={col.type === 'text' ? 'text' : 'number'}
-                                                        {...methods.register(fieldName as any)}
-                                                    />
-                                                )}
-                                            />
+                                {fields.map((field, index) => {
+                                  const item = watchedItems[index];
+                                  return (
+                                    <tr key={field.id} className="items-start">
+                                        <td>
+                                        <FormField
+                                            control={control}
+                                            name={`items.${index}.description`}
+                                            render={({ field }) => ( <FormItem><FormControl><Input placeholder="Item description" {...field} /></FormControl><FormMessage /></FormItem> )}
+                                        />
                                         </td>
-                                      )
-                                    })}
-                                    <td className="text-right py-2 font-medium align-top">
-                                        {formatCurrency(calculateLineItemTotal(watchedItems[index]), currency)}
-                                    </td>
-                                    <td className='align-top'>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="text-destructive hover:text-destructive"
-                                        onClick={() => remove(index)}
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                    </td>
-                                </tr>
-                                ))}
+                                        <td>
+                                        <FormField
+                                            control={control}
+                                            name={`items.${index}.quantity`}
+                                            render={({ field }) => ( <FormItem><FormControl><Input type="number" placeholder="Qty" {...field} /></FormControl><FormMessage /></FormItem> )}
+                                        />
+                                        </td>
+                                        <td>
+                                        <FormField
+                                            control={control}
+                                            name={`items.${index}.unitPrice`}
+                                            render={({ field }) => ( <FormItem><FormControl><Input type="number" placeholder="Price" {...field} /></FormControl><FormMessage /></FormItem> )}
+                                        />
+                                        </td>
+                                        {customColumns.map((col, colIndex) => {
+                                          const customFieldIndex = (item.customFields || []).findIndex(cf => cf.name === col.name);
+                                          const fieldName = `items.${index}.customFields.${customFieldIndex}.value`
+                                          const nameFieldName = `items.${index}.customFields.${customFieldIndex}.name`
+
+                                          return (
+                                            <td key={col.name}>
+                                                <input type="hidden" {...methods.register(nameFieldName as any)} value={col.name} />
+                                                <Input
+                                                    placeholder={col.name}
+                                                    type={col.type === 'text' ? 'text' : 'number'}
+                                                    {...methods.register(fieldName as any)}
+                                                />
+                                            </td>
+                                          )
+                                        })}
+                                        <td className="text-right py-2 font-medium align-top">
+                                            {formatCurrency(calculateLineItemTotal(item), currency)}
+                                        </td>
+                                        <td className='align-top'>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="text-destructive hover:text-destructive"
+                                            onClick={() => remove(index)}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                        </td>
+                                    </tr>
+                                  )
+                                })}
                                 </tbody>
                             </table>
                         </div>
@@ -662,5 +668,3 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
     </FormProvider>
   );
 }
-
-    

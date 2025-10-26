@@ -7,6 +7,7 @@ import InvoiceForm from '@/components/invoice/invoice-form';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { useUser } from '@/firebase/auth/use-user';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function InvoiceTemplatePage({ params }: { params?: { id: string } }) {
   const { user } = useUser();
@@ -22,8 +23,13 @@ export default function InvoiceTemplatePage({ params }: { params?: { id: string 
 
   const { data: invoice, isLoading } = useDoc<InvoiceWithId>(invoiceRef);
 
-  if (isLoading) {
-    return <p>Loading invoice...</p>;
+  if (isLoading && params?.id) {
+    return (
+        <div className="space-y-8">
+            <Skeleton className="h-[600px] w-full" />
+            <Skeleton className="h-[70vh] w-full" />
+        </div>
+    );
   }
 
   if (params?.id && !invoice && !isLoading) {

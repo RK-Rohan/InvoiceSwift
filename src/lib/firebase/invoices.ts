@@ -35,9 +35,9 @@ function getInvoiceItemsCollection(invoiceId: string) {
     return collection(firestore, 'users', user.uid, 'invoices', invoiceId, 'items');
 }
 
-const calculateTotalAmount = (invoiceData: Partial<InvoiceFormData>): number => {
+const calculateSubtotal = (invoiceData: Partial<InvoiceFormData>): number => {
   if (!invoiceData.items) return 0;
-  const subtotal = invoiceData.items.reduce((acc, item) => {
+  return invoiceData.items.reduce((acc, item) => {
     let itemTotal = (item.quantity || 0) * (item.unitPrice || 0);
     if (item.customFields && invoiceData.customColumns) {
       item.customFields.forEach(field => {
@@ -52,19 +52,18 @@ const calculateTotalAmount = (invoiceData: Partial<InvoiceFormData>): number => 
     }
     return acc + itemTotal;
   }, 0);
-
-  return subtotal - (invoiceData.discount || 0) - (invoiceData.totalPaid || 0);
 };
 
 export function addInvoice(invoiceData: InvoiceFormData) {
   const invoicesCollection = getInvoicesCollection();
   
-  const totalAmount = calculateTotalAmount(invoiceData);
+  const subtotal = calculateSubtotal(invoiceData);
+  const totalAmount = subtotal - (invoiceData.discount || 0) - (invoiceData.totalPaid || 0);
 
   const data = {
     ...invoiceData,
-    issueDate: format(invoiceData.issueDate, 'yyyy-MM-dd'),
-    dueDate: format(invoiceData.dueDate, 'yyyy-MM-dd'),
+    issueDate: format(new Date(invoiceData.issueDate), 'yyyy-MM-dd'),
+    dueDate: format(new Date(invoiceData.dueDate), 'yyyy-MM-dd'),
     currency: invoiceData.currency || 'USD',
     totalAmount: totalAmount,
     createdAt: serverTimestamp(),
@@ -89,7 +88,9 @@ export function addInvoice(invoiceData: InvoiceFormData) {
 export function updateInvoice(invoiceId: string, invoiceData: Partial<InvoiceFormData>) {
   const invoiceDoc = doc(getInvoicesCollection(), invoiceId);
   
-  const totalAmount = calculateTotalAmount(invoiceData);
+  const subtotal = calculateSubtotal(invoiceData);
+  const totalAmount = subtotal - (invoiceData.discount || 0) - (invoiceData.totalPaid || 0);
+
 
   const data: Partial<Invoice & { updatedAt: any }> = {
     ...invoiceData,
