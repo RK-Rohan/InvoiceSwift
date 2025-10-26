@@ -91,7 +91,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
       items: [{ description: '', quantity: 1, unitPrice: 0, customFields: [] }],
       notes: '',
       customColumns: [],
-      currency: 'USD',
+      currency: 'BDT',
     },
   });
 
@@ -132,7 +132,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
         dueDate: new Date(invoice.dueDate),
         items: invoice.items.map(item => ({...item, customFields: item.customFields || [] })),
         customColumns: invoice.customColumns || [],
-        currency: invoice.currency || 'USD',
+        currency: invoice.currency || 'BDT',
       });
     } else {
       reset({
@@ -147,7 +147,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
         items: [{ description: '', quantity: 1, unitPrice: 0, customFields: [] }],
         notes: 'Thank you for your business.',
         customColumns: [],
-        currency: 'USD',
+        currency: 'BDT',
       });
     }
   }, [invoice, reset]);
@@ -292,7 +292,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                                 <FormItem>
                                   <FormLabel>Currency</FormLabel>
                                   <FormControl>
-                                    <Input placeholder="USD" {...field} />
+                                    <Input placeholder="BDT" {...field} />
                                   </FormControl>
                                    <FormDescription>
                                     3-letter currency code (e.g., USD, BDT).
@@ -617,3 +617,5 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
     </FormProvider>
   );
 }
+
+    
