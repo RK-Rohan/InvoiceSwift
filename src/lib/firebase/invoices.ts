@@ -37,7 +37,7 @@ function getInvoiceItemsCollection(invoiceId: string) {
 
 const calculateTotalAmount = (invoiceData: Partial<InvoiceFormData>): number => {
   if (!invoiceData.items) return 0;
-  return invoiceData.items.reduce((acc, item) => {
+  const subtotal = invoiceData.items.reduce((acc, item) => {
     let itemTotal = (item.quantity || 0) * (item.unitPrice || 0);
     if (item.customFields && invoiceData.customColumns) {
       item.customFields.forEach(field => {
@@ -52,6 +52,8 @@ const calculateTotalAmount = (invoiceData: Partial<InvoiceFormData>): number => 
     }
     return acc + itemTotal;
   }, 0);
+
+  return subtotal - (invoiceData.discount || 0) - (invoiceData.totalPaid || 0);
 };
 
 export function addInvoice(invoiceData: InvoiceFormData) {

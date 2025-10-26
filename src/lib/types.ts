@@ -52,6 +52,8 @@ export const invoiceFormSchema = z.object({
   })).min(1, 'At least one item is required.'),
   notes: z.string().optional(),
   customColumns: z.array(customColumnSchema).optional(),
+  discount: z.coerce.number().optional(),
+  totalPaid: z.coerce.number().optional(),
 });
 
 export const invoiceSchema = invoiceFormSchema.extend({

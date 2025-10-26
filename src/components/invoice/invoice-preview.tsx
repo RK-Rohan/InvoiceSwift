@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import { cn, formatCurrency } from '@/lib/utils';
 import type { InvoiceFormData, CompanyProfile, CustomColumn } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { Separator } from '../ui/separator';
 
 type InvoicePreviewProps = {
   generatedHtml: string | null;
@@ -56,7 +57,7 @@ export default function InvoicePreview({ generatedHtml, companyProfile, showQty 
   };
 
   const subtotal = useMemo(() => data.items.reduce((acc, item) => acc + calculateLineItemTotal(item), 0), [data.items, customColumns]);
-
+  const amountDue = useMemo(() => subtotal - (data.discount || 0) - (data.totalPaid || 0), [subtotal, data.discount, data.totalPaid]);
 
   const DefaultPreview = () => (
     <CardContent className="p-6 sm:p-8">
@@ -118,10 +119,27 @@ export default function InvoicePreview({ generatedHtml, companyProfile, showQty 
         </TableBody>
       </Table>
       <div className="flex justify-end mt-8">
-        <div className="w-full max-w-xs space-y-2">
-          <div className="flex justify-between font-bold text-lg border-t pt-2">
-            <span>Total</span>
+        <div className="w-full max-w-sm space-y-2">
+          <div className="flex justify-between">
+            <span>Subtotal</span>
             <span>{formatCurrency(subtotal, data.currency)}</span>
+          </div>
+          {(data.discount || 0) > 0 && (
+             <div className="flex justify-between">
+                <span>Discount</span>
+                <span>-{formatCurrency(data.discount || 0, data.currency)}</span>
+              </div>
+          )}
+          {(data.totalPaid || 0) > 0 && (
+             <div className="flex justify-between">
+                <span>Total Paid</span>
+                <span>-{formatCurrency(data.totalPaid || 0, data.currency)}</span>
+              </div>
+          )}
+          <Separator />
+          <div className="flex justify-between font-bold text-lg">
+            <span>Amount Due</span>
+            <span>{formatCurrency(amountDue, data.currency)}</span>
           </div>
         </div>
       </div>
@@ -163,3 +181,4 @@ export default function InvoicePreview({ generatedHtml, companyProfile, showQty 
     </Card>
   );
 }
+

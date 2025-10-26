@@ -92,6 +92,8 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
       notes: '',
       customColumns: [],
       currency: 'BDT',
+      discount: 0,
+      totalPaid: 0,
     },
   });
 
@@ -105,6 +107,8 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   const watchedItems = watch('items');
   const customColumns = watch('customColumns') || [];
   const currency = watch('currency');
+  const discount = watch('discount') || 0;
+  const totalPaid = watch('totalPaid') || 0;
   
   const allColumns = useMemo(() => ['Description', 'Qty', 'Price', ...customColumns.map(c => c.name)], [customColumns]);
 
@@ -123,6 +127,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   };
 
   const subtotal = useMemo(() => watchedItems.reduce((acc, item) => acc + calculateLineItemTotal(item), 0), [watchedItems, customColumns]);
+  const amountDue = useMemo(() => subtotal - discount - totalPaid, [subtotal, discount, totalPaid]);
 
   useEffect(() => {
     if (invoice) {
@@ -133,6 +138,8 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
         items: invoice.items.map(item => ({...item, customFields: item.customFields || [] })),
         customColumns: invoice.customColumns || [],
         currency: invoice.currency || 'BDT',
+        discount: invoice.discount || 0,
+        totalPaid: invoice.totalPaid || 0,
       });
     } else {
       reset({
@@ -148,6 +155,8 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
         notes: 'Thank you for your business.',
         customColumns: [],
         currency: 'BDT',
+        discount: 0,
+        totalPaid: 0,
       });
     }
   }, [invoice, reset]);
@@ -217,7 +226,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
     try {
         const invoiceData = {
             ...values,
-            totalAmount: subtotal,
+            totalAmount: amountDue,
             items: values.items.map(item => ({
               ...item,
               customFields: (item.customFields || []).map(cf => ({...cf})) // Ensure it's a plain object
@@ -583,6 +592,45 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                         </div>
                         </div>
 
+                        <div className="flex justify-end">
+                            <div className="w-full max-w-sm space-y-4">
+                                <div className="grid grid-cols-2 items-center gap-4">
+                                    <span className="font-medium text-right">Subtotal</span>
+                                    <span className="text-right font-medium">{formatCurrency(subtotal, currency)}</span>
+                                </div>
+                                <FormField
+                                  control={control}
+                                  name="discount"
+                                  render={({ field }) => (
+                                    <FormItem className="grid grid-cols-2 items-center gap-4">
+                                      <FormLabel className="text-right">Discount</FormLabel>
+                                      <FormControl>
+                                        <Input type="number" placeholder="0.00" {...field} className="text-right" />
+                                      </FormControl>
+                                      <FormMessage className="col-span-2" />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={control}
+                                  name="totalPaid"
+                                  render={({ field }) => (
+                                    <FormItem className="grid grid-cols-2 items-center gap-4">
+                                      <FormLabel className="text-right">Total Paid</FormLabel>
+                                      <FormControl>
+                                        <Input type="number" placeholder="0.00" {...field} className="text-right" />
+                                      </FormControl>
+                                      <FormMessage className="col-span-2" />
+                                    </FormItem>
+                                  )}
+                                />
+                                <div className="grid grid-cols-2 items-center gap-4 font-bold text-lg">
+                                    <span className="text-right">Amount Due</span>
+                                    <span className="text-right">{formatCurrency(amountDue, currency)}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <FormField
                         control={control}
                         name="notes"
@@ -596,10 +644,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                             </FormItem>
                         )}
                         />
-                        
-                        <div className="text-right font-bold text-lg">
-                            Total: {formatCurrency(subtotal, currency)}
-                        </div>
+
                     </CardContent>
                     <CardFooter className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={() => router.push('/invoices')}>
