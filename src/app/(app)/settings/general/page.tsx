@@ -17,11 +17,11 @@ import { Input } from '@/components/ui/input';
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
@@ -53,7 +53,6 @@ export default function GeneralSettingsPage() {
       phone: '',
       address: '',
       logoUrl: '',
-      currency: 'USD',
     },
   });
 
@@ -78,7 +77,7 @@ export default function GeneralSettingsPage() {
 
   const onSubmit = async (values: CompanyProfileFormData) => {
     if (!companyProfileRef) return;
-    const dataToSave = { ...values, currency: values.currency?.toUpperCase(), updatedAt: serverTimestamp() };
+    const dataToSave = { ...values, updatedAt: serverTimestamp() };
     
     setDoc(companyProfileRef, dataToSave, { merge: true })
     .then(() => {
@@ -152,22 +151,6 @@ export default function GeneralSettingsPage() {
                   <FormControl>
                     <Input type="email" placeholder="contact@yourcompany.com" {...field} />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             <FormField
-              control={form.control}
-              name="currency"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Currency</FormLabel>
-                  <FormControl>
-                    <Input placeholder="USD" {...field} />
-                  </FormControl>
-                   <FormDescription>
-                    Enter the 3-letter currency code (e.g., USD, EUR, BDT).
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

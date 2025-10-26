@@ -20,6 +20,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form';
 import {
   Dialog,
@@ -86,6 +87,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
       items: [{ description: '', quantity: 1, unitPrice: 0, customFields: [] }],
       notes: '',
       customColumns: [],
+      currency: 'USD',
     },
   });
 
@@ -98,6 +100,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   
   const watchedItems = watch('items');
   const customColumns = watch('customColumns') || [];
+  const currency = watch('currency');
   
   const allColumns = useMemo(() => ['Description', 'Qty', 'Price', ...customColumns.map(c => c.name)], [customColumns]);
 
@@ -125,6 +128,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
         dueDate: new Date(invoice.dueDate),
         items: invoice.items.map(item => ({...item, customFields: item.customFields || [] })),
         customColumns: invoice.customColumns || [],
+        currency: invoice.currency || 'USD',
       });
     } else {
       reset({
@@ -136,6 +140,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
         items: [{ description: '', quantity: 1, unitPrice: 0, customFields: [] }],
         notes: 'Thank you for your business.',
         customColumns: [],
+        currency: 'USD',
       });
     }
   }, [invoice, reset]);
@@ -241,7 +246,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                 <Form {...methods}>
                     <form onSubmit={handleSubmit(onSubmit)}>
                     <CardContent className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <FormField
                             control={control}
                             name="clientId"
@@ -270,6 +275,24 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                                 </FormItem>
                             )}
                             />
+                            <FormField
+                              control={control}
+                              name="currency"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Currency</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="USD" {...field} />
+                                  </FormControl>
+                                   <FormDescription>
+                                    3-letter currency code (e.g., USD, BDT).
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <FormField
                             control={control}
                             name="issueDate"
@@ -420,7 +443,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                                       )
                                     })}
                                     <td className="text-right py-2 font-medium align-top">
-                                        {formatCurrency(calculateLineItemTotal(watchedItems[index]), companyProfile?.currency)}
+                                        {formatCurrency(calculateLineItemTotal(watchedItems[index]), currency)}
                                     </td>
                                     <td className='align-top'>
                                     <Button
@@ -552,7 +575,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                         />
                         
                         <div className="text-right font-bold text-lg">
-                            Total: {formatCurrency(subtotal, companyProfile?.currency)}
+                            Total: {formatCurrency(subtotal, currency)}
                         </div>
                     </CardContent>
                     <CardFooter className="flex justify-end gap-2">

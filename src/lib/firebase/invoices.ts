@@ -63,6 +63,7 @@ export function addInvoice(invoiceData: InvoiceFormData) {
     ...invoiceData,
     issueDate: format(invoiceData.issueDate, 'yyyy-MM-dd'),
     dueDate: format(invoiceData.dueDate, 'yyyy-MM-dd'),
+    currency: invoiceData.currency || 'USD',
     totalAmount: totalAmount,
     createdAt: serverTimestamp(),
     customColumns: invoiceData.customColumns || [],
@@ -94,6 +95,7 @@ export function updateInvoice(invoiceId: string, invoiceData: Partial<InvoiceFor
     ...(invoiceData.dueDate && { dueDate: format(new Date(invoiceData.dueDate), 'yyyy-MM-dd') }),
     totalAmount: totalAmount,
     updatedAt: serverTimestamp(),
+    currency: invoiceData.currency || 'USD',
     customColumns: invoiceData.customColumns || [],
     items: (invoiceData.items || []).map(item => ({
       ...item,

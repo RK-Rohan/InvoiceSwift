@@ -40,6 +40,7 @@ export const invoiceFormSchema = z.object({
   invoiceNumber: z.string().min(1, 'Invoice number is required.'),
   issueDate: dateOrStringSchema,
   dueDate: dateOrStringSchema,
+  currency: z.string().optional().default('USD'),
   items: z.array(z.object({
     description: z.string().min(1, 'Item description is required.'),
     quantity: z.coerce.number().min(1, 'Quantity must be at least 1.'),
@@ -71,7 +72,6 @@ export const companyProfileSchema = z.object({
   phone: z.string().optional(),
   address: z.string().optional(),
   logoUrl: z.string().optional(),
-  currency: z.string().optional().default('USD'),
 });
 
 export type LineItem = z.infer<typeof lineItemSchema>;

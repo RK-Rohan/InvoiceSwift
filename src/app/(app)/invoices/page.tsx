@@ -97,7 +97,7 @@ export default function InvoicesPage() {
                       <TableCell>{invoice.clientName}</TableCell>
                       <TableCell>{invoice.issueDate ? format(new Date(invoice.issueDate), 'PPP') : ''}</TableCell>
                       <TableCell>{invoice.dueDate ? format(new Date(invoice.dueDate), 'PPP') : ''}</TableCell>
-                      <TableCell>{formatCurrency(invoice.totalAmount, companyProfile?.currency)}</TableCell>
+                      <TableCell>{formatCurrency(invoice.totalAmount, invoice.currency)}</TableCell>
                       <TableCell>{getStatus(invoice)}</TableCell>
                       <TableCell className="text-right">
                         <Button asChild variant="ghost" size="icon">
