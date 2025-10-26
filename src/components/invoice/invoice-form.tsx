@@ -83,6 +83,9 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
     defaultValues: {
       clientId: '',
       clientName: '',
+      clientEmail: '',
+      clientPhoneNumber: '',
+      clientAddress: '',
       invoiceNumber: '',
       items: [{ description: '', quantity: 1, unitPrice: 0, customFields: [] }],
       notes: '',
@@ -136,6 +139,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
         clientName: '',
         clientEmail: '',
         clientPhoneNumber: '',
+        clientAddress: '',
         invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
         issueDate: new Date(),
         dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
@@ -262,6 +266,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                                         setValue('clientName', selectedClient.name);
                                         setValue('clientEmail', selectedClient.email);
                                         setValue('clientPhoneNumber', selectedClient.phoneNumber);
+                                        setValue('clientAddress', selectedClient.address);
                                     }
                                 }} defaultValue={field.value}>
                                     <FormControl>

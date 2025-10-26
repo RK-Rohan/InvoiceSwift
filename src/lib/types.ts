@@ -39,6 +39,7 @@ export const invoiceFormSchema = z.object({
   clientName: z.string(),
   clientEmail: z.string().optional(),
   clientPhoneNumber: z.string().optional(),
+  clientAddress: z.string().optional(),
   invoiceNumber: z.string().min(1, 'Invoice number is required.'),
   issueDate: dateOrStringSchema,
   dueDate: dateOrStringSchema,
@@ -85,3 +86,4 @@ export type InvoiceWithId = z.infer<typeof invoiceWithIdSchema>;
 export type CustomizationData = z.infer<typeof customizationSchema>;
 export type CompanyProfile = z.infer<typeof companyProfileSchema>;
 export type CustomColumn = z.infer<typeof customColumnSchema>;
+
