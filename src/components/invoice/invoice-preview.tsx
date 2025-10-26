@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useMemo } from 'react';
@@ -15,9 +16,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 type InvoicePreviewProps = {
   generatedHtml: string | null;
   companyProfile: CompanyProfile | null;
+  showQty?: boolean;
 };
 
-export default function InvoicePreview({ generatedHtml, companyProfile }: InvoicePreviewProps) {
+export default function InvoicePreview({ generatedHtml, companyProfile, showQty = true }: InvoicePreviewProps) {
   const { watch } = useFormContext<InvoiceFormData>();
   const data = watch();
   const customColumns = data.customColumns || [];
@@ -93,7 +95,7 @@ export default function InvoicePreview({ generatedHtml, companyProfile }: Invoic
         <TableHeader>
           <TableRow>
             <TableHead>Item</TableHead>
-            <TableHead className="text-center">Quantity</TableHead>
+            {showQty && <TableHead className="text-center">Quantity</TableHead>}
             <TableHead className="text-right">Price</TableHead>
             {customColumns.map(col => <TableHead key={col.name} className="text-right">{col.name}</TableHead>)}
             <TableHead className="text-right">Total</TableHead>
@@ -103,7 +105,7 @@ export default function InvoicePreview({ generatedHtml, companyProfile }: Invoic
           {data.items.map((item, index) => (
             <TableRow key={index}>
               <TableCell className="font-medium">{item.description}</TableCell>
-              <TableCell className="text-center">{item.quantity}</TableCell>
+              {showQty && <TableCell className="text-center">{item.quantity}</TableCell>}
               <TableCell className="text-right">{formatCurrency(item.unitPrice || 0, data.currency)}</TableCell>
               {customColumns.map(col => (
                   <TableCell key={col.name} className="text-right">

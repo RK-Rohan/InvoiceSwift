@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, PlusCircle, Trash2, X } from 'lucide-react';
+import { CalendarIcon, PlusCircle, Trash2, X, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   Form,
@@ -64,6 +64,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   const [newColumnType, setNewColumnType] = useState<'text' | 'subtractive' | 'additive'>('text');
   const [newColumnPosition, setNewColumnPosition] = useState<'before' | 'after'>('after');
   const [referenceColumn, setReferenceColumn] = useState<string>('');
+  const [showQtyInPreview, setShowQtyInPreview] = useState(true);
 
 
   const clientsCollection = useMemoFirebase(
@@ -387,7 +388,20 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                                 <thead>
                                     <tr>
                                         <th className="px-2 py-2 text-left w-1/3">Description</th>
-                                        <th className="px-2 py-2 text-left">Qty</th>
+                                        <th className="px-2 py-2 text-left">
+                                            <div className="flex items-center gap-1">
+                                                Qty
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-5 w-5"
+                                                    onClick={() => setShowQtyInPreview(!showQtyInPreview)}
+                                                >
+                                                    {showQtyInPreview ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                                                </Button>
+                                            </div>
+                                        </th>
                                         <th className="px-2 py-2 text-left">Price</th>
                                         {customColumns.map(col => (
                                             <th key={col.name} className="px-2 py-2 text-left">
@@ -598,7 +612,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                     </form>
                 </Form>
             </Card>
-            <InvoicePreview generatedHtml={generatedHtml} companyProfile={companyProfile} />
+            <InvoicePreview generatedHtml={generatedHtml} companyProfile={companyProfile} showQty={showQtyInPreview} />
         </div>
     </FormProvider>
   );
