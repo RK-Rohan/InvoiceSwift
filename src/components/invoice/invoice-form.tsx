@@ -134,6 +134,8 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
       reset({
         clientId: '',
         clientName: '',
+        clientEmail: '',
+        clientPhoneNumber: '',
         invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
         issueDate: new Date(),
         dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
@@ -238,7 +240,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
 
   return (
     <FormProvider {...methods}>
-        <div className="grid grid-cols-1 gap-8">
+        <div className="space-y-8">
             <Card>
                 <CardHeader>
                     <CardTitle>{invoice ? 'Edit Invoice' : 'Create New Invoice'}</CardTitle>
@@ -258,6 +260,8 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                                     field.onChange(value);
                                     if (selectedClient) {
                                         setValue('clientName', selectedClient.name);
+                                        setValue('clientEmail', selectedClient.email);
+                                        setValue('clientPhoneNumber', selectedClient.phoneNumber);
                                     }
                                 }} defaultValue={field.value}>
                                     <FormControl>

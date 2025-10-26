@@ -80,6 +80,8 @@ export default function InvoicePreview({ generatedHtml, companyProfile }: Invoic
         <div>
           <h3 className="font-semibold mb-1">Bill To</h3>
           <p className="font-medium">{data.clientName}</p>
+          <p className="text-sm text-muted-foreground">{data.clientEmail}</p>
+          <p className="text-sm text-muted-foreground">{data.clientPhoneNumber}</p>
         </div>
         <div className="text-right">
           <p><span className="font-semibold">Issue Date:</span> {data.issueDate ? format(new Date(data.issueDate), 'PPP') : ''}</p>

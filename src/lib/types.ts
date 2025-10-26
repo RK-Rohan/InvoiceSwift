@@ -37,6 +37,8 @@ const customFieldSchema = z.object({
 export const invoiceFormSchema = z.object({
   clientId: z.string().min(1, 'Client is required.'),
   clientName: z.string(),
+  clientEmail: z.string().optional(),
+  clientPhoneNumber: z.string().optional(),
   invoiceNumber: z.string().min(1, 'Invoice number is required.'),
   issueDate: dateOrStringSchema,
   dueDate: dateOrStringSchema,
