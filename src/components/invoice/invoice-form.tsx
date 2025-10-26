@@ -58,7 +58,7 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
   const router = useRouter();
   const firestore = useFirestore();
   const { user } = useUser();
-  const [invoiceId, setInvoiceId] = useState<string | undefined>(undefined);
+  const [invoiceId, setInvoiceId] = useState<string | undefined>(params?.id);
   const [generatedHtml, setGeneratedHtml] = useState<string | null>(null);
   const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
@@ -107,12 +107,17 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
       invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
       issueDate: new Date(),
       dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
-      items: [{ description: '', quantity: 1, unitPrice: 0, customFields: [] }],
+      items: [
+        { description: 'Website Development (fancyglobalbd.com)', quantity: 1, unitPrice: 10000.00, customFields: [] },
+        { description: 'Website Development (fancytravelbd.com)', quantity: 1, unitPrice: 10000.00, customFields: [] },
+        { description: 'Webhosting (fancyglobalbd.com)', quantity: 1, unitPrice: 2000.00, customFields: [] },
+        { description: 'Webhosting (fancytravelbd.com)', quantity: 1, unitPrice: 2000.00, customFields: [] },
+      ],
       notes: 'Thank you for your business.',
       customColumns: [],
       currency: 'BDT',
-      discount: 0,
-      totalPaid: 0,
+      discount: 4000,
+      totalPaid: 12000,
   };
 
   const methods = useForm<InvoiceFormData>({
@@ -143,7 +148,7 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
         dueDate: invoice.dueDate ? new Date(invoice.dueDate) : new Date(),
         items: (invoice.items || []).map(item => ({...item, customFields: item.customFields || [] })),
         customColumns: invoice.customColumns || [],
-        currency: invoice.currency || 'BDT',
+        currency: invoice.currency || 'USD',
         discount: invoice.discount || 0,
         totalPaid: invoice.totalPaid || 0,
       };
@@ -704,3 +709,5 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
     </FormProvider>
   );
 }
+
+    
