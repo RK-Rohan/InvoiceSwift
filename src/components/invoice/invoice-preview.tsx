@@ -127,13 +127,13 @@ export default function InvoicePreview({ generatedHtml, companyProfile, showQty 
           {(data.discount || 0) > 0 && (
              <div className="flex justify-between">
                 <span>Discount</span>
-                <span>-{formatCurrency(data.discount || 0, data.currency)}</span>
+                <span>{formatCurrency(data.discount || 0, data.currency)}</span>
               </div>
           )}
           {(data.totalPaid || 0) > 0 && (
              <div className="flex justify-between">
                 <span>Total Paid</span>
-                <span>-{formatCurrency(data.totalPaid || 0, data.currency)}</span>
+                <span>{formatCurrency(data.totalPaid || 0, data.currency)}</span>
               </div>
           )}
           <Separator />
@@ -181,4 +181,3 @@ export default function InvoicePreview({ generatedHtml, companyProfile, showQty 
     </Card>
   );
 }
-
