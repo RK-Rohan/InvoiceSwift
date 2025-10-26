@@ -131,16 +131,17 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
 
   useEffect(() => {
     if (invoice) {
-      reset({
+      const invoiceData = {
         ...invoice,
-        issueDate: new Date(invoice.issueDate),
-        dueDate: new Date(invoice.dueDate),
+        issueDate: invoice.issueDate ? new Date(invoice.issueDate) : new Date(),
+        dueDate: invoice.dueDate ? new Date(invoice.dueDate) : new Date(),
         items: invoice.items.map(item => ({...item, customFields: item.customFields || [] })),
         customColumns: invoice.customColumns || [],
         currency: invoice.currency || 'BDT',
         discount: invoice.discount || 0,
         totalPaid: invoice.totalPaid || 0,
-      });
+      };
+      reset(invoiceData);
     } else {
       reset({
         clientId: '',
@@ -278,7 +279,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                                         setValue('clientPhoneNumber', selectedClient.phoneNumber);
                                         setValue('clientAddress', selectedClient.address);
                                     }
-                                }} defaultValue={field.value}>
+                                }} value={field.value}>
                                     <FormControl>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select a client" />
