@@ -63,7 +63,7 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
   const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
   const [newColumnType, setNewColumnType] = useState<'text' | 'subtractive' | 'additive'>('text');
-  const [newColumnPosition, setNewColumnPosition] = useState<'before' | 'after'>('after');
+  const [newColumnPosition, setNewColumnPosition] = useState<'after' | 'after'>('after');
   const [referenceColumn, setReferenceColumn] = useState<string>('');
   const [showQtyInPreview, setShowQtyInPreview] = useState(true);
 
@@ -148,10 +148,15 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
         totalPaid: invoice.totalPaid || 0,
       };
       reset(invoiceData);
-    } else if (!invoiceId && !isInvoiceLoading) {
-      reset(defaultInvoiceValues);
     }
-  }, [invoice, isInvoiceLoading, invoiceId, reset]);
+  }, [invoice, isInvoiceLoading, reset]);
+  
+  useEffect(() => {
+      if (!invoiceId && !isInvoiceLoading) {
+        reset(defaultInvoiceValues);
+      }
+  }, [invoiceId, isInvoiceLoading, reset]);
+
 
   const calculateLineItemTotal = (item: any) => {
     let total = (item.quantity || 0) * (item.unitPrice || 0);
@@ -166,6 +171,25 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
       }
     });
     return total;
+  };
+  
+  const calculateSubtotalForSave = (invoiceData: Partial<InvoiceFormData>): number => {
+    if (!invoiceData.items) return 0;
+    return invoiceData.items.reduce((acc, item) => {
+      let itemTotal = (item.quantity || 0) * (item.unitPrice || 0);
+      if (item.customFields && invoiceData.customColumns) {
+        item.customFields.forEach(field => {
+          const column = invoiceData.customColumns?.find(c => c.name === field.name);
+          const value = parseFloat(field.value) || 0;
+          if (column?.type === 'subtractive') {
+            itemTotal -= value;
+          } else if (column?.type === 'additive') {
+            itemTotal += value;
+          }
+        });
+      }
+      return acc + itemTotal;
+    }, 0);
   };
 
   const subtotal = useMemo(() => {
@@ -247,25 +271,6 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
         return { ...item, customFields: newCustomFields };
     });
     setValue('items', updatedItems);
-  };
-
-  const calculateSubtotalForSave = (invoiceData: Partial<InvoiceFormData>): number => {
-    if (!invoiceData.items) return 0;
-    return invoiceData.items.reduce((acc, item) => {
-      let itemTotal = (item.quantity || 0) * (item.unitPrice || 0);
-      if (item.customFields && invoiceData.customColumns) {
-        item.customFields.forEach(field => {
-          const column = invoiceData.customColumns?.find(c => c.name === field.name);
-          const value = parseFloat(field.value) || 0;
-          if (column?.type === 'subtractive') {
-            itemTotal -= value;
-          } else if (column?.type === 'additive') {
-            itemTotal += value;
-          }
-        });
-      }
-      return acc + itemTotal;
-    }, 0);
   };
   
   const onSubmit = async (values: InvoiceFormData) => {
@@ -725,5 +730,3 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
     </FormProvider>
   );
 }
-
-    
