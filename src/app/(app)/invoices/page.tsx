@@ -7,7 +7,7 @@ import { collection, query, orderBy, doc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { PlusCircle, Edit, Trash2, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, MoreHorizontal, Copy } from 'lucide-react';
 import { type InvoiceWithId, type CompanyProfile } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
@@ -16,11 +16,14 @@ import { Badge } from '@/components/ui/badge';
 import DeleteInvoiceDialog from '@/components/invoice/delete-invoice-dialog';
 import AddPaymentDialog from '@/components/invoice/add-payment-dialog';
 import Link from 'next/link';
+import { duplicateInvoice } from '@/lib/firebase/invoices';
+import { useToast } from '@/hooks/use-toast';
 
 export default function InvoicesPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceWithId | null>(null);
+  const { toast } = useToast();
 
   const firestore = useFirestore();
   const { user } = useUser();
@@ -47,12 +50,31 @@ export default function InvoicesPage() {
   );
   const { data: companyProfile } = useDoc<CompanyProfile>(companyProfileRef);
 
-  const handleAction = (invoice: InvoiceWithId, action: 'edit' | 'delete' | 'payment') => {
+  const handleAction = (invoice: InvoiceWithId, action: 'edit' | 'delete' | 'payment' | 'duplicate') => {
     setSelectedInvoice(invoice);
     if (action === 'delete') {
       setIsDeleteDialogOpen(true);
     } else if (action === 'payment') {
       setIsPaymentDialogOpen(true);
+    } else if (action === 'duplicate') {
+      handleDuplicateInvoice(invoice);
+    }
+  };
+
+  const handleDuplicateInvoice = async (invoice: InvoiceWithId) => {
+    try {
+      await duplicateInvoice(invoice);
+      toast({
+        title: "Invoice Duplicated",
+        description: `A new draft has been created from invoice #${invoice.invoiceNumber}.`
+      });
+    } catch (error) {
+      console.error("Failed to duplicate invoice:", error);
+      toast({
+        variant: "destructive",
+        title: "Uh oh! Something went wrong.",
+        description: "Could not duplicate the invoice.",
+      });
     }
   };
 
@@ -144,7 +166,12 @@ export default function InvoicesPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem asChild>
-                                <Link href={`/invoices/${invoice.id}/edit`}>Edit</Link>
+                                <Link href={`/invoices/${invoice.id}/edit`} className="flex items-center">
+                                  <Edit className="mr-2 h-4 w-4" /> Edit
+                                </Link>
+                              </DropdownMenuItem>
+                               <DropdownMenuItem onClick={() => handleAction(invoice, 'duplicate')} className="flex items-center">
+                                <Copy className="mr-2 h-4 w-4" /> Duplicate
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleAction(invoice, 'payment')}>
                                 Add Payment

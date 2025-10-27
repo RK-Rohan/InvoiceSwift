@@ -18,7 +18,7 @@ import {
   deleteDocumentNonBlocking,
   updateDocumentNonBlocking,
 } from '@/firebase';
-import type { Invoice, InvoiceFormData } from '@/lib/types';
+import type { Invoice, InvoiceFormData, InvoiceWithId } from '@/lib/types';
 import { format } from 'date-fns';
 
 const { firestore, auth } = initializeFirebase();
@@ -88,18 +88,18 @@ export function updateInvoice(invoiceId: string, invoiceData: Partial<InvoiceFor
     updatedAt: serverTimestamp(),
   };
 
-  // If items are being updated, we must recalculate the totalAmount
-  if (invoiceData.items || invoiceData.discount !== undefined) {
-    const subtotal = calculateSubtotal(invoiceData);
-    dataToUpdate.totalAmount = subtotal - (invoiceData.discount || 0);
-  }
-
   // Convert dates to string format if they exist in the payload
-  if (invoiceData.issueDate) {
+  if (invoiceData.issueDate && typeof invoiceData.issueDate !== 'string') {
     dataToUpdate.issueDate = format(new Date(invoiceData.issueDate), 'yyyy-MM-dd');
   }
-  if (invoiceData.dueDate) {
+  if (invoiceData.dueDate && typeof invoiceData.dueDate !== 'string') {
     dataToUpdate.dueDate = format(new Date(invoiceData.dueDate), 'yyyy-MM-dd');
+  }
+
+  // If items, customColumns, or discount are being updated, we must recalculate the totalAmount
+  if (invoiceData.items || invoiceData.customColumns || invoiceData.discount !== undefined) {
+      const subtotal = calculateSubtotal(invoiceData);
+      dataToUpdate.totalAmount = subtotal - (invoiceData.discount || 0);
   }
 
   updateDocumentNonBlocking(invoiceDoc, dataToUpdate);
@@ -108,4 +108,20 @@ export function updateInvoice(invoiceId: string, invoiceData: Partial<InvoiceFor
 export function deleteInvoice(invoiceId: string) {
   const invoiceDoc = doc(getInvoicesCollection(), invoiceId);
   deleteDocumentNonBlocking(invoiceDoc);
+}
+
+export async function duplicateInvoice(originalInvoice: InvoiceWithId) {
+  // Omit 'id' and other fields that should not be copied directly.
+  const { id, totalAmount, ...copiedData } = originalInvoice;
+
+  const newInvoiceData: InvoiceFormData = {
+    ...copiedData,
+    invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
+    issueDate: new Date(),
+    dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
+    totalPaid: 0, // Reset payment status for the new invoice
+    createdAt: serverTimestamp(),
+  };
+
+  return addInvoice(newInvoiceData);
 }

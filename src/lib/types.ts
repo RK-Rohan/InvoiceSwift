@@ -54,6 +54,7 @@ export const invoiceFormSchema = z.object({
   customColumns: z.array(customColumnSchema).optional(),
   discount: z.coerce.number().optional(),
   totalPaid: z.coerce.number().optional(),
+  createdAt: z.any().optional(), // Allow serverTimestamp
 });
 
 export const invoiceSchema = invoiceFormSchema.extend({
