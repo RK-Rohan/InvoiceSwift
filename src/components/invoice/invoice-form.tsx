@@ -107,17 +107,12 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
       invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
       issueDate: new Date(),
       dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
-      items: [
-        { description: 'Website Development (fancyglobalbd.com)', quantity: 1, unitPrice: 10000.00, customFields: [] },
-        { description: 'Website Development (fancytravelbd.com)', quantity: 1, unitPrice: 10000.00, customFields: [] },
-        { description: 'Webhosting (fancyglobalbd.com)', quantity: 1, unitPrice: 2000.00, customFields: [] },
-        { description: 'Webhosting (fancytravelbd.com)', quantity: 1, unitPrice: 2000.00, customFields: [] },
-      ],
+      items: [{ description: '', quantity: 1, unitPrice: 0, customFields: [] }],
       notes: 'Thank you for your business.',
       customColumns: [],
-      currency: 'BDT',
-      discount: 4000,
-      totalPaid: 12000,
+      currency: 'USD',
+      discount: 0,
+      totalPaid: 0,
   };
 
   const methods = useForm<InvoiceFormData>({
@@ -256,8 +251,12 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
 
   const onSubmit = async (values: InvoiceFormData) => {
     try {
+        const subtotal = calculateSubtotal(values);
+        const totalAmount = subtotal - (values.discount || 0);
+
         const invoiceData = {
             ...values,
+            totalAmount,
             items: values.items.map(item => ({
               ...item,
               customFields: (item.customFields || []).map(cf => ({...cf}))
@@ -345,7 +344,7 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
                                 <FormItem>
                                   <FormLabel>Currency</FormLabel>
                                   <FormControl>
-                                    <Input placeholder="BDT" {...field} />
+                                    <Input placeholder="USD" {...field} />
                                   </FormControl>
                                    <FormDescription>
                                     3-letter currency code (e.g., USD, BDT).
@@ -707,5 +706,3 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
     </FormProvider>
   );
 }
-
-    
