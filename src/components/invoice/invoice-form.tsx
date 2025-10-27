@@ -152,7 +152,7 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
     });
     return total;
   };
-
+  
   const calculateSubtotal = (invoiceData: Partial<InvoiceFormData>): number => {
     if (!invoiceData.items) return 0;
     return invoiceData.items.reduce((acc, item) => {
@@ -192,7 +192,7 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
       if (!invoiceId && !isInvoiceLoading) {
         reset(defaultInvoiceValues);
       }
-  }, [invoiceId, isInvoiceLoading, reset, defaultInvoiceValues]);
+  }, [invoiceId, isInvoiceLoading, reset]);
   
   const subtotal = useMemo(() => {
     if (!watchedItems) return 0;
