@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useCollection, useUser, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, orderBy, doc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
@@ -66,8 +66,24 @@ export default function InvoicesPage() {
     setSelectedInvoice(null);
   }
 
+  const calculateAmountDue = (invoice: InvoiceWithId) => {
+    const subtotal = invoice.items.reduce((acc, item) => {
+      let itemTotal = (item.quantity || 0) * (item.unitPrice || 0);
+      if (item.customFields && invoice.customColumns) {
+        item.customFields.forEach(field => {
+          const column = invoice.customColumns?.find(c => c.name === field.name);
+          const value = parseFloat(field.value) || 0;
+          if (column?.type === 'subtractive') itemTotal -= value;
+          else if (column?.type === 'additive') itemTotal += value;
+        });
+      }
+      return acc + itemTotal;
+    }, 0);
+    return subtotal - (invoice.discount || 0) - (invoice.totalPaid || 0);
+  };
+
   const getStatus = (invoice: InvoiceWithId) => {
-    const amountDue = (invoice.totalAmount || 0) - (invoice.totalPaid || 0);
+    const amountDue = calculateAmountDue(invoice);
     if (amountDue <= 0) {
       return <Badge variant="default" className="bg-accent text-accent-foreground">Paid</Badge>;
     }
@@ -109,7 +125,7 @@ export default function InvoicesPage() {
               <TableBody>
                 {invoices && invoices.length > 0 ? (
                   invoices.map(invoice => {
-                    const amountDue = (invoice.totalAmount || 0) - (invoice.totalPaid || 0);
+                    const amountDue = calculateAmountDue(invoice);
                     return (
                       <TableRow key={invoice.id}>
                         <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
