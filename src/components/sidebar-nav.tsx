@@ -5,6 +5,7 @@ import {
   Users,
   Settings,
   ChevronDown,
+  LayoutDashboard,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -13,6 +14,11 @@ import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
 const menuItems = [
+  {
+    label: 'Dashboard',
+    href: '/dashboard',
+    icon: LayoutDashboard,
+  },
   {
     label: 'Invoices',
     href: '/invoices',
