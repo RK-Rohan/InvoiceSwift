@@ -7,7 +7,7 @@ import { collection, query, orderBy, doc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { PlusCircle, Edit, Trash2, MoreHorizontal, Copy } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, MoreHorizontal, Copy, CreditCard } from 'lucide-react';
 import { type InvoiceWithId, type CompanyProfile } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
@@ -173,14 +173,14 @@ export default function InvoicesPage() {
                                <DropdownMenuItem onClick={() => handleAction(invoice, 'duplicate')} className="flex items-center">
                                 <Copy className="mr-2 h-4 w-4" /> Duplicate
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleAction(invoice, 'payment')}>
-                                Add Payment
+                              <DropdownMenuItem onClick={() => handleAction(invoice, 'payment')} className="flex items-center">
+                                <CreditCard className="mr-2 h-4 w-4" /> Add Payment
                               </DropdownMenuItem>
                               <DropdownMenuItem 
-                                className="text-destructive"
+                                className="text-destructive flex items-center"
                                 onClick={() => handleAction(invoice, 'delete')}
                               >
-                                Delete
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
