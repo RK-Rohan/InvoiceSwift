@@ -11,6 +11,7 @@ import { DollarSign, TrendingUp, CircleDollarSign, FileText } from 'lucide-react
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts"
 import { format } from 'date-fns';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 export default function DashboardPage() {
   const firestore = useFirestore();
