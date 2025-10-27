@@ -66,8 +66,8 @@ export default function InvoicesPage() {
     setSelectedInvoice(null);
   }
 
-  const calculateAmountDue = (invoice: InvoiceWithId) => {
-    const subtotal = invoice.items.reduce((acc, item) => {
+  const calculateSubtotal = (invoice: InvoiceWithId) => {
+    return invoice.items.reduce((acc, item) => {
       let itemTotal = (item.quantity || 0) * (item.unitPrice || 0);
       if (item.customFields && invoice.customColumns) {
         item.customFields.forEach(field => {
@@ -79,11 +79,9 @@ export default function InvoicesPage() {
       }
       return acc + itemTotal;
     }, 0);
-    return subtotal - (invoice.discount || 0) - (invoice.totalPaid || 0);
   };
 
-  const getStatus = (invoice: InvoiceWithId) => {
-    const amountDue = calculateAmountDue(invoice);
+  const getStatus = (amountDue: number, invoice: InvoiceWithId) => {
     if (amountDue <= 0) {
       return <Badge variant="default" className="bg-accent text-accent-foreground">Paid</Badge>;
     }
@@ -125,16 +123,18 @@ export default function InvoicesPage() {
               <TableBody>
                 {invoices && invoices.length > 0 ? (
                   invoices.map(invoice => {
-                    const amountDue = calculateAmountDue(invoice);
+                    const subtotal = calculateSubtotal(invoice);
+                    const totalAmount = subtotal - (invoice.discount || 0);
+                    const amountDue = totalAmount - (invoice.totalPaid || 0);
                     return (
                       <TableRow key={invoice.id}>
                         <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                         <TableCell>{invoice.clientName}</TableCell>
                         <TableCell>{invoice.issueDate ? format(new Date(invoice.issueDate), 'PPP') : ''}</TableCell>
-                        <TableCell>{formatCurrency(invoice.totalAmount, invoice.currency)}</TableCell>
+                        <TableCell>{formatCurrency(totalAmount, invoice.currency)}</TableCell>
                         <TableCell>{formatCurrency(invoice.totalPaid || 0, invoice.currency)}</TableCell>
                         <TableCell>{formatCurrency(amountDue, invoice.currency)}</TableCell>
-                        <TableCell>{getStatus(invoice)}</TableCell>
+                        <TableCell>{getStatus(amountDue, invoice)}</TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
