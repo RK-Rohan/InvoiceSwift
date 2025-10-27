@@ -88,8 +88,11 @@ export function addInvoice(invoiceData: InvoiceFormData) {
 export function updateInvoice(invoiceId: string, invoiceData: Partial<InvoiceFormData>) {
   const invoiceDoc = doc(getInvoicesCollection(), invoiceId);
   
-  const subtotal = calculateSubtotal(invoiceData);
-  const totalAmount = subtotal - (invoiceData.discount || 0);
+  let totalAmount = invoiceData.totalAmount;
+  if(invoiceData.items) {
+    const subtotal = calculateSubtotal(invoiceData);
+    totalAmount = subtotal - (invoiceData.discount || 0);
+  }
 
 
   const data: Partial<Invoice & { updatedAt: any }> = {
@@ -113,3 +116,5 @@ export function deleteInvoice(invoiceId: string) {
   const invoiceDoc = doc(getInvoicesCollection(), invoiceId);
   deleteDocumentNonBlocking(invoiceDoc);
 }
+
+    

@@ -249,9 +249,28 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
     setValue('items', updatedItems);
   };
 
+  const calculateSubtotalForSave = (invoiceData: Partial<InvoiceFormData>): number => {
+    if (!invoiceData.items) return 0;
+    return invoiceData.items.reduce((acc, item) => {
+      let itemTotal = (item.quantity || 0) * (item.unitPrice || 0);
+      if (item.customFields && invoiceData.customColumns) {
+        item.customFields.forEach(field => {
+          const column = invoiceData.customColumns?.find(c => c.name === field.name);
+          const value = parseFloat(field.value) || 0;
+          if (column?.type === 'subtractive') {
+            itemTotal -= value;
+          } else if (column?.type === 'additive') {
+            itemTotal += value;
+          }
+        });
+      }
+      return acc + itemTotal;
+    }, 0);
+  };
+  
   const onSubmit = async (values: InvoiceFormData) => {
     try {
-        const subtotal = calculateSubtotal(values);
+        const subtotal = calculateSubtotalForSave(values);
         const totalAmount = subtotal - (values.discount || 0);
 
         const invoiceData = {
@@ -706,3 +725,5 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
     </FormProvider>
   );
 }
+
+    
