@@ -67,6 +67,10 @@ export default function InvoicesPage() {
   }
 
   const getStatus = (invoice: InvoiceWithId) => {
+    const amountDue = (invoice.totalAmount || 0) - (invoice.totalPaid || 0);
+    if (amountDue <= 0) {
+      return <Badge variant="default" className="bg-accent text-accent-foreground">Paid</Badge>;
+    }
     if (invoice.dueDate && new Date(invoice.dueDate) < new Date()) {
       return <Badge variant="destructive">Overdue</Badge>;
     }
@@ -95,50 +99,55 @@ export default function InvoicesPage() {
                   <TableHead>Number</TableHead>
                   <TableHead>Client</TableHead>
                   <TableHead>Issue Date</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Total</TableHead>
+                  <TableHead>Total Amount</TableHead>
+                  <TableHead>Paid</TableHead>
+                  <TableHead>Amount Due</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {invoices && invoices.length > 0 ? (
-                  invoices.map(invoice => (
-                    <TableRow key={invoice.id}>
-                      <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
-                      <TableCell>{invoice.clientName}</TableCell>
-                      <TableCell>{invoice.issueDate ? format(new Date(invoice.issueDate), 'PPP') : ''}</TableCell>
-                      <TableCell>{invoice.dueDate ? format(new Date(invoice.dueDate), 'PPP') : ''}</TableCell>
-                      <TableCell>{formatCurrency(invoice.totalAmount, invoice.currency)}</TableCell>
-                      <TableCell>{getStatus(invoice)}</TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                               <Link href={`/invoices/${invoice.id}/edit`}>Edit</Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleAction(invoice, 'payment')}>
-                              Add Payment
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              className="text-destructive"
-                              onClick={() => handleAction(invoice, 'delete')}
-                            >
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  invoices.map(invoice => {
+                    const amountDue = (invoice.totalAmount || 0) - (invoice.totalPaid || 0);
+                    return (
+                      <TableRow key={invoice.id}>
+                        <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                        <TableCell>{invoice.clientName}</TableCell>
+                        <TableCell>{invoice.issueDate ? format(new Date(invoice.issueDate), 'PPP') : ''}</TableCell>
+                        <TableCell>{formatCurrency(invoice.totalAmount, invoice.currency)}</TableCell>
+                        <TableCell>{formatCurrency(invoice.totalPaid || 0, invoice.currency)}</TableCell>
+                        <TableCell>{formatCurrency(amountDue, invoice.currency)}</TableCell>
+                        <TableCell>{getStatus(invoice)}</TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem asChild>
+                                <Link href={`/invoices/${invoice.id}/edit`}>Edit</Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleAction(invoice, 'payment')}>
+                                Add Payment
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="text-destructive"
+                                onClick={() => handleAction(invoice, 'delete')}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center">
+                    <TableCell colSpan={8} className="text-center">
                       No invoices found.
                     </TableCell>
                   </TableRow>
