@@ -48,6 +48,7 @@ import InvoicePreview from './invoice-preview';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Label } from '../ui/label';
 import { Skeleton } from '../ui/skeleton';
+import ClientForm from '@/components/clients/client-form';
 
 type InvoiceFormProps = {
   params?: { id: string };
@@ -66,6 +67,7 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
   const [newColumnPosition, setNewColumnPosition] = useState<'after' | 'after'>('after');
   const [referenceColumn, setReferenceColumn] = useState<string>('');
   const [showQtyInPreview, setShowQtyInPreview] = useState(true);
+  const [isClientFormOpen, setIsClientFormOpen] = useState(false);
 
   // Handle resolving params promise
   useEffect(() => {
@@ -136,29 +138,6 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
   
   const allColumns = useMemo(() => ['Description', 'Qty', 'Price', ...customColumns.map(c => c.name)], [customColumns]);
 
-  useEffect(() => {
-    if (invoice && !isInvoiceLoading) {
-      const invoiceData = {
-        ...invoice,
-        issueDate: invoice.issueDate ? new Date(invoice.issueDate) : new Date(),
-        dueDate: invoice.dueDate ? new Date(invoice.dueDate) : new Date(),
-        items: (invoice.items || []).map(item => ({...item, customFields: item.customFields || [] })),
-        customColumns: invoice.customColumns || [],
-        currency: invoice.currency || 'USD',
-        discount: invoice.discount || 0,
-        totalPaid: invoice.totalPaid || 0,
-      };
-      reset(invoiceData);
-    }
-  }, [invoice, isInvoiceLoading, reset]);
-  
-  useEffect(() => {
-      if (!invoiceId && !isInvoiceLoading) {
-        reset(defaultInvoiceValues);
-      }
-  }, [invoiceId, isInvoiceLoading, reset]);
-
-
   const calculateLineItemTotal = (item: any) => {
     let total = (item.quantity || 0) * (item.unitPrice || 0);
     const formCustomColumns = getValues('customColumns') || [];
@@ -192,6 +171,28 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
       return acc + itemTotal;
     }, 0);
   };
+
+  useEffect(() => {
+    if (invoice && !isInvoiceLoading) {
+      const invoiceData = {
+        ...invoice,
+        issueDate: invoice.issueDate ? new Date(invoice.issueDate) : new Date(),
+        dueDate: invoice.dueDate ? new Date(invoice.dueDate) : new Date(),
+        items: (invoice.items || []).map(item => ({...item, customFields: item.customFields || [] })),
+        customColumns: invoice.customColumns || [],
+        currency: invoice.currency || 'USD',
+        discount: invoice.discount || 0,
+        totalPaid: invoice.totalPaid || 0,
+      };
+      reset(invoiceData);
+    }
+  }, [invoice, isInvoiceLoading, reset]);
+  
+  useEffect(() => {
+      if (!invoiceId && !isInvoiceLoading) {
+        reset(defaultInvoiceValues);
+      }
+  }, [invoiceId, isInvoiceLoading, reset, defaultInvoiceValues]);
   
   const subtotal = useMemo(() => {
     if (!watchedItems) return 0;
@@ -337,32 +338,37 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
                             render={({ field }) => (
                                 <FormItem>
                                 <FormLabel>Client</FormLabel>
-                                <Select 
-                                    key={watchedClientId || 'select-client'}
-                                    onValueChange={(value) => {
-                                        const selectedClient = clients?.find(c => c.id === value);
-                                        field.onChange(value);
-                                        if (selectedClient) {
-                                            setValue('clientName', selectedClient.name);
-                                            setValue('clientEmail', selectedClient.email);
-                                            setValue('clientPhoneNumber', selectedClient.phoneNumber);
-                                            setValue('clientAddress', selectedClient.address);
-                                        }
-                                    }} 
-                                    value={field.value}
-                                    defaultValue={field.value}
-                                >
-                                    <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select a client" />
-                                    </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                    {clients?.map((client) => (
-                                        <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                                    ))}
-                                    </SelectContent>
-                                </Select>
+                                <div className="flex items-center gap-2">
+                                    <Select 
+                                        key={watchedClientId || 'select-client'}
+                                        onValueChange={(value) => {
+                                            const selectedClient = clients?.find(c => c.id === value);
+                                            field.onChange(value);
+                                            if (selectedClient) {
+                                                setValue('clientName', selectedClient.name);
+                                                setValue('clientEmail', selectedClient.email);
+                                                setValue('clientPhoneNumber', selectedClient.phoneNumber);
+                                                setValue('clientAddress', selectedClient.address);
+                                            }
+                                        }} 
+                                        value={field.value}
+                                        defaultValue={field.value}
+                                    >
+                                        <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select a client" />
+                                        </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                        {clients?.map((client) => (
+                                            <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                                        ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <Button type="button" variant="outline" size="icon" onClick={() => setIsClientFormOpen(true)}>
+                                        <PlusCircle className="h-4 w-4" />
+                                    </Button>
+                                </div>
                                 <FormMessage />
                                 </FormItem>
                             )}
@@ -733,6 +739,13 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
             </Card>
             <InvoicePreview generatedHtml={generatedHtml} companyProfile={companyProfile} showQty={showQtyInPreview} />
         </div>
+        <ClientForm 
+            isOpen={isClientFormOpen}
+            onClose={() => setIsClientFormOpen(false)}
+            client={null}
+        />
     </FormProvider>
   );
 }
+
+    
