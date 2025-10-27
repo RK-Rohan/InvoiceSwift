@@ -29,12 +29,6 @@ function getInvoicesCollection() {
   return collection(firestore, 'users', user.uid, 'invoices');
 }
 
-function getInvoiceItemsCollection(invoiceId: string) {
-    const user = auth.currentUser;
-    if (!user) throw new Error('User not authenticated');
-    return collection(firestore, 'users', user.uid, 'invoices', invoiceId, 'items');
-}
-
 const calculateSubtotal = (invoiceData: Partial<InvoiceFormData>): number => {
   if (!invoiceData.items) return 0;
   return invoiceData.items.reduce((acc, item) => {
@@ -87,34 +81,31 @@ export function addInvoice(invoiceData: InvoiceFormData) {
 
 export function updateInvoice(invoiceId: string, invoiceData: Partial<InvoiceFormData>) {
   const invoiceDoc = doc(getInvoicesCollection(), invoiceId);
-  
-  let totalAmount = invoiceData.totalAmount;
-  if(invoiceData.items) {
-    const subtotal = calculateSubtotal(invoiceData);
-    totalAmount = subtotal - (invoiceData.discount || 0);
-  }
 
-
-  const data: Partial<Invoice & { updatedAt: any }> = {
+  // Start with the provided data and add the update timestamp
+  const dataToUpdate: Partial<Invoice & { updatedAt: any }> = {
     ...invoiceData,
-    ...(invoiceData.issueDate && { issueDate: format(new Date(invoiceData.issueDate), 'yyyy-MM-dd') }),
-    ...(invoiceData.dueDate && { dueDate: format(new Date(invoiceData.dueDate), 'yyyy-MM-dd') }),
-    totalAmount: totalAmount,
     updatedAt: serverTimestamp(),
-    currency: invoiceData.currency || 'USD',
-    customColumns: invoiceData.customColumns || [],
-    items: (invoiceData.items || []).map(item => ({
-      ...item,
-      customFields: item.customFields || [],
-    })),
   };
 
-  updateDocumentNonBlocking(invoiceDoc, data);
+  // If items are being updated, we must recalculate the totalAmount
+  if (invoiceData.items || invoiceData.discount !== undefined) {
+    const subtotal = calculateSubtotal(invoiceData);
+    dataToUpdate.totalAmount = subtotal - (invoiceData.discount || 0);
+  }
+
+  // Convert dates to string format if they exist in the payload
+  if (invoiceData.issueDate) {
+    dataToUpdate.issueDate = format(new Date(invoiceData.issueDate), 'yyyy-MM-dd');
+  }
+  if (invoiceData.dueDate) {
+    dataToUpdate.dueDate = format(new Date(invoiceData.dueDate), 'yyyy-MM-dd');
+  }
+
+  updateDocumentNonBlocking(invoiceDoc, dataToUpdate);
 }
 
 export function deleteInvoice(invoiceId: string) {
   const invoiceDoc = doc(getInvoicesCollection(), invoiceId);
   deleteDocumentNonBlocking(invoiceDoc);
 }
-
-    
