@@ -132,6 +132,7 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
   const currency = watch('currency');
   const discount = watch('discount') || 0;
   const totalPaid = watch('totalPaid') || 0;
+  const watchedClientId = watch('clientId');
   
   const allColumns = useMemo(() => ['Description', 'Qty', 'Price', ...customColumns.map(c => c.name)], [customColumns]);
 
@@ -172,8 +173,8 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
     });
     return total;
   };
-  
-  const calculateSubtotalForSave = (invoiceData: Partial<InvoiceFormData>): number => {
+
+  const calculateSubtotal = (invoiceData: Partial<InvoiceFormData>): number => {
     if (!invoiceData.items) return 0;
     return invoiceData.items.reduce((acc, item) => {
       let itemTotal = (item.quantity || 0) * (item.unitPrice || 0);
@@ -191,7 +192,7 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
       return acc + itemTotal;
     }, 0);
   };
-
+  
   const subtotal = useMemo(() => {
     if (!watchedItems) return 0;
     return watchedItems.reduce((acc, item) => acc + calculateLineItemTotal(item), 0)
@@ -275,7 +276,7 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
   
   const onSubmit = async (values: InvoiceFormData) => {
     try {
-        const subtotal = calculateSubtotalForSave(values);
+        const subtotal = calculateSubtotal(values);
         const totalAmount = subtotal - (values.discount || 0);
 
         const invoiceData = {
@@ -336,16 +337,21 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
                             render={({ field }) => (
                                 <FormItem>
                                 <FormLabel>Client</FormLabel>
-                                <Select onValueChange={(value) => {
-                                    const selectedClient = clients?.find(c => c.id === value);
-                                    field.onChange(value);
-                                    if (selectedClient) {
-                                        setValue('clientName', selectedClient.name);
-                                        setValue('clientEmail', selectedClient.email);
-                                        setValue('clientPhoneNumber', selectedClient.phoneNumber);
-                                        setValue('clientAddress', selectedClient.address);
-                                    }
-                                }} value={field.value}>
+                                <Select 
+                                    key={watchedClientId || 'select-client'}
+                                    onValueChange={(value) => {
+                                        const selectedClient = clients?.find(c => c.id === value);
+                                        field.onChange(value);
+                                        if (selectedClient) {
+                                            setValue('clientName', selectedClient.name);
+                                            setValue('clientEmail', selectedClient.email);
+                                            setValue('clientPhoneNumber', selectedClient.phoneNumber);
+                                            setValue('clientAddress', selectedClient.address);
+                                        }
+                                    }} 
+                                    value={field.value}
+                                    defaultValue={field.value}
+                                >
                                     <FormControl>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select a client" />
