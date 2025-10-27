@@ -152,7 +152,7 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
     });
     return total;
   };
-  
+
   const calculateSubtotal = (invoiceData: Partial<InvoiceFormData>): number => {
     if (!invoiceData.items) return 0;
     return invoiceData.items.reduce((acc, item) => {
@@ -277,8 +277,8 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
   
   const onSubmit = async (values: InvoiceFormData) => {
     try {
-        const subtotal = calculateSubtotal(values);
-        const totalAmount = subtotal - (values.discount || 0);
+        const subtotalVal = calculateSubtotal(values);
+        const totalAmount = subtotalVal - (values.discount || 0);
 
         const invoiceData = {
             ...values,
@@ -747,5 +747,3 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
     </FormProvider>
   );
 }
-
-    
