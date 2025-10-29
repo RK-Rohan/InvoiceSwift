@@ -7,7 +7,7 @@ import { collection, query, orderBy, doc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { PlusCircle, Edit, Trash2, MoreHorizontal, Copy, CreditCard } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, MoreHorizontal, Copy, CreditCard, Printer } from 'lucide-react';
 import { type InvoiceWithId, type CompanyProfile } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
@@ -172,6 +172,11 @@ export default function InvoicesPage() {
                               </DropdownMenuItem>
                                <DropdownMenuItem onClick={() => handleAction(invoice, 'duplicate')} className="flex items-center">
                                 <Copy className="mr-2 h-4 w-4" /> Duplicate
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link href={`/invoices/${invoice.id}/view`} target="_blank" className="flex items-center">
+                                  <Printer className="mr-2 h-4 w-4" /> View/Print
+                                </Link>
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleAction(invoice, 'payment')} className="flex items-center">
                                 <CreditCard className="mr-2 h-4 w-4" /> Add Payment
