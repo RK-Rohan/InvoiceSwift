@@ -1,16 +1,16 @@
 
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, useFieldArray, FormProvider } from 'react-hook-form';
+import { useForm, useFieldArray, FormProvider, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, PlusCircle, Trash2, X, Eye, EyeOff } from 'lucide-react';
+import { CalendarIcon, PlusCircle, Trash2, X, Eye, EyeOff, Pencil } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   Form,
@@ -32,8 +32,8 @@ import {
 } from '@/components/ui/dialog';
 import { type InvoiceFormData, type InvoiceWithId, invoiceFormSchema, type Client, type CompanyProfile, type CustomColumn } from '@/lib/types';
 import { addInvoice, updateInvoice } from '@/lib/firebase/invoices';
-import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { useCollection, useDoc } from '@/firebase';
+import { useUser } from '@/auth';
 import { cn, formatCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
 import {
@@ -51,70 +51,108 @@ import { Skeleton } from '../ui/skeleton';
 import ClientForm from '@/components/clients/client-form';
 
 type InvoiceFormProps = {
-  params?: { id: string };
+  params?: { id: string } | Promise<{ id: string }>;
 };
 
 export default function InvoiceForm({ params }: InvoiceFormProps) {
   const { toast } = useToast();
   const router = useRouter();
-  const firestore = useFirestore();
   const { user } = useUser();
   const [invoiceId, setInvoiceId] = useState<string | undefined>(params?.id);
+  const mountedRef = useRef(false);
+  const [clientsVersion, setClientsVersion] = useState(0);
   const [generatedHtml, setGeneratedHtml] = useState<string | null>(null);
   const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
   const [newColumnType, setNewColumnType] = useState<'text' | 'subtractive' | 'additive'>('text');
-  const [newColumnPosition, setNewColumnPosition] = useState<'after' | 'after'>('after');
+  const [newColumnPosition, setNewColumnPosition] = useState<'after' | 'before'>('after');
   const [referenceColumn, setReferenceColumn] = useState<string>('');
   const [showQtyInPreview, setShowQtyInPreview] = useState(true);
   const [isClientFormOpen, setIsClientFormOpen] = useState(false);
+  const [showDiscountLine, setShowDiscountLine] = useState(true);
+  const [discountLabel, setDiscountLabel] = useState('Discount');
+  const [showTaxLine, setShowTaxLine] = useState(true);
+  const [taxLabel, setTaxLabel] = useState('VAT / Tax');
+  const [columnLabels, setColumnLabels] = useState<{ [key: string]: string }>({
+    Description: 'Description',
+    Qty: 'Qty',
+    Price: 'Price',
+  });
 
-  // Handle resolving params promise
+  // Handle resolving params promise without direct property access
   useEffect(() => {
+    let cancelled = false;
     const resolveParams = async () => {
-      if (params?.id) {
-        const id = await params.id;
-        setInvoiceId(id);
+      if (!params) return;
+      try {
+        const resolved = typeof (params as any).then === 'function' ? await params : params;
+        if (!cancelled && resolved?.id) {
+          setInvoiceId(resolved.id);
+        }
+      } catch (e) {
+        console.error('Failed to resolve params', e);
       }
     };
     resolveParams();
+    return () => {
+      cancelled = true;
+    };
   }, [params]);
 
 
-  const invoiceRef = useMemoFirebase(
-    () => (invoiceId && user && firestore ? doc(firestore, 'users', user.uid, 'invoices', invoiceId) : null),
-    [invoiceId, user, firestore]
+  const invoiceEndpoint = useMemo(
+    () => (invoiceId && user ? `/api/invoices/${invoiceId}` : null),
+    [invoiceId, user]
   );
-  const { data: invoice, isLoading: isInvoiceLoading } = useDoc<InvoiceWithId>(invoiceRef);
+  const { data: invoice, isLoading: isInvoiceLoading } = useDoc<InvoiceWithId>(invoiceEndpoint);
 
+  const { data: clients } = useCollection<Client>(user ? `/api/clients?v=${clientsVersion}` : null);
 
-  const clientsCollection = useMemoFirebase(
-    () => (user && firestore ? collection(firestore, 'users', user.uid, 'clients') : null),
-    [user, firestore]
-  );
-  const { data: clients } = useCollection<Client>(clientsCollection);
-
-  const companyProfileRef = useMemoFirebase(
-    () => (user && firestore ? doc(firestore, 'users', user.uid, 'companyProfile', 'profile') : null),
-    [user, firestore]
-  );
-  const { data: companyProfile } = useDoc<CompanyProfile>(companyProfileRef);
+  const { data: companyProfile } = useDoc<CompanyProfile>(user ? '/api/company-profile' : null);
 
   const defaultInvoiceValues: InvoiceFormData = {
+    clientId: '',
+    clientName: '',
+    clientEmail: '',
+    clientPhoneNumber: '',
+    clientAddress: '',
+    status: 'Final',
+    invoiceNumber: '',
+    issueDate: new Date(0),
+    dueDate: new Date(0),
+    items: [{ description: '', quantity: 1, unitPrice: 0, customFields: [] }],
+    notes: 'Thank you for your business.',
+    customColumns: [],
+    currency: 'USD',
+    discount: 0,
+    discountType: 'fixed',
+    tax: 0,
+    totalPaid: 0,
+  };
+
+  const buildDefaultInvoice = (): InvoiceFormData => {
+    const now = new Date();
+    const due = new Date(now);
+    due.setDate(due.getDate() + 3);
+    return {
       clientId: '',
       clientName: '',
       clientEmail: '',
       clientPhoneNumber: '',
       clientAddress: '',
+      status: 'Final',
       invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
-      issueDate: new Date(),
-      dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
+      issueDate: now,
+      dueDate: due,
       items: [{ description: '', quantity: 1, unitPrice: 0, customFields: [] }],
       notes: 'Thank you for your business.',
       customColumns: [],
-      currency: 'USD',
+      currency: 'BDT',
       discount: 0,
+      discountType: 'fixed',
+      tax: 0,
       totalPaid: 0,
+    };
   };
 
   const methods = useForm<InvoiceFormData>({
@@ -122,24 +160,51 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
     defaultValues: defaultInvoiceValues,
   });
 
-  const { control, formState, watch, reset, handleSubmit, setValue, getValues } = methods;
+  const { control, formState, reset, handleSubmit, setValue, getValues } = methods;
+  const selectClientById = (id: string) => {
+    const selectedClient = clients?.find(c => c.id === id);
+    if (selectedClient) {
+      setValue('clientId', selectedClient.id);
+      setValue('clientName', selectedClient.name);
+      setValue('clientEmail', selectedClient.email);
+      setValue('clientPhoneNumber', selectedClient.phoneNumber);
+      setValue('clientAddress', selectedClient.address);
+    }
+  };
 
   const { fields, append, remove } = useFieldArray({
     control,
     name: 'items',
   });
   
-  const watchedItems = watch('items');
-  const customColumns = watch('customColumns') || [];
-  const currency = watch('currency');
-  const discount = watch('discount') || 0;
-  const totalPaid = watch('totalPaid') || 0;
-  const watchedClientId = watch('clientId');
+  const watchedItems = useWatch({ control, name: 'items' }) || [];
+  const customColumns = useWatch({ control, name: 'customColumns' }) || [];
+  const currency = useWatch({ control, name: 'currency' });
+  const discount = Number(useWatch({ control, name: 'discount' }) || 0);
+  const discountType = useWatch({ control, name: 'discountType' }) || 'fixed';
+  const tax = Number(useWatch({ control, name: 'tax' }) || 0);
+  const taxType = useWatch({ control, name: 'taxType' }) || 'fixed';
+  const totalPaid = Number(useWatch({ control, name: 'totalPaid' }) || 0);
+  const watchedClientId = useWatch({ control, name: 'clientId' });
   
-  const allColumns = useMemo(() => ['Description', 'Qty', 'Price', ...customColumns.map(c => c.name)], [customColumns]);
+  const defaultColumns = ['Description', 'Qty', 'Price'];
+  const orderedColumns = useMemo(() => {
+    const cols = [...defaultColumns];
+    customColumns.forEach((col) => {
+      const anchorIndex = col.anchor ? cols.indexOf(col.anchor) : -1;
+      if (anchorIndex !== -1) {
+        const insertAt = col.position === 'before' ? anchorIndex : anchorIndex + 1;
+        cols.splice(insertAt, 0, col.name);
+      } else {
+        cols.push(col.name);
+      }
+    });
+    return cols;
+  }, [customColumns]);
 
   const calculateLineItemTotal = (item: any) => {
-    let total = (item.quantity || 0) * (item.unitPrice || 0);
+    if (!item) return 0;
+    let total = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
     const formCustomColumns = getValues('customColumns') || [];
     item.customFields?.forEach((field: any) => {
       const column = formCustomColumns.find(c => c.name === field.name);
@@ -182,6 +247,9 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
         customColumns: invoice.customColumns || [],
         currency: invoice.currency || 'USD',
         discount: invoice.discount || 0,
+        discountType: invoice.discountType || 'fixed',
+        tax: invoice.tax || 0,
+        taxType: invoice.taxType || 'fixed',
         totalPaid: invoice.totalPaid || 0,
       };
       reset(invoiceData);
@@ -190,7 +258,7 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
   
   useEffect(() => {
       if (!invoiceId && !isInvoiceLoading) {
-        reset(defaultInvoiceValues);
+        reset(buildDefaultInvoice());
       }
   }, [invoiceId, isInvoiceLoading, reset]);
   
@@ -199,64 +267,70 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
     return watchedItems.reduce((acc, item) => acc + calculateLineItemTotal(item), 0)
   }, [watchedItems, customColumns]);
 
-  const amountDue = useMemo(() => subtotal - discount - totalPaid, [subtotal, discount, totalPaid]);
+  const discountAmount = useMemo(
+    () => (discountType === 'percent' ? (subtotal * discount) / 100 : discount),
+    [discountType, discount, subtotal]
+  );
+  const taxAmount = useMemo(
+    () => (taxType === 'percent' ? (subtotal * tax) / 100 : tax),
+    [taxType, tax, subtotal]
+  );
 
-   useEffect(() => {
+  const amountDue = useMemo(
+    () => subtotal + taxAmount - discountAmount - totalPaid,
+    [subtotal, taxAmount, discountAmount, totalPaid]
+  );
+
+  const allColumns = orderedColumns;
+
+  const handleEditLabel = (key: string) => {
+    const current = columnLabels[key] || key;
+    const updated = typeof window !== 'undefined' ? window.prompt('Edit column label', current) : null;
+    if (updated && updated.trim()) {
+      setColumnLabels((prev) => ({ ...prev, [key]: updated.trim() }));
+    }
+  };
+
+  const handleEditDiscountLabel = () => {
+    const updated = typeof window !== 'undefined' ? window.prompt('Edit discount label', discountLabel) : null;
+    if (updated && updated.trim()) {
+      setDiscountLabel(updated.trim());
+    }
+  };
+
+  const handleEditTaxLabel = () => {
+    const updated = typeof window !== 'undefined' ? window.prompt('Edit tax label', taxLabel) : null;
+    if (updated && updated.trim()) {
+      setTaxLabel(updated.trim());
+    }
+  };
+
+  useEffect(() => {
     if (isColumnDialogOpen) {
       setReferenceColumn(allColumns[allColumns.length - 1]);
     }
   }, [isColumnDialogOpen, allColumns]);
 
   const handleAddColumn = () => {
-    if (newColumnName && !customColumns.find(c => c.name === newColumnName)) {
-      const currentCustomColumns = getValues('customColumns') || [];
-      const newColumn: CustomColumn = { name: newColumnName, type: newColumnType };
+    if (!newColumnName || customColumns.find(c => c.name === newColumnName)) return;
+    const currentCustomColumns = getValues('customColumns') || [];
+    const newColumn: CustomColumn = { name: newColumnName, type: newColumnType, position: newColumnPosition, anchor: referenceColumn };
+    const newCustomColumns = [...currentCustomColumns, newColumn];
+    setValue('customColumns', newCustomColumns);
 
-      let insertIndex = currentCustomColumns.length;
+    const currentItems = getValues('items');
+    const updatedItems = currentItems.map(item => {
+      const newCustomFields = [...(item.customFields || [])];
+      newCustomFields.push({ name: newColumnName, value: '' });
+      return { ...item, customFields: newCustomFields };
+    });
+    setValue('items', updatedItems);
 
-      if (referenceColumn) {
-          const isDefaultColumn = ['Description', 'Qty', 'Price'].includes(referenceColumn);
-          const defaultCols = ['Description', 'Qty', 'Price'];
-          
-          if(isDefaultColumn) {
-            const refIndex = defaultCols.indexOf(referenceColumn);
-             if (newColumnPosition === 'before') {
-                // This is tricky because we can't actually insert before default columns.
-                // For simplicity, we'll treat 'before Description' as the first custom column.
-                insertIndex = 0;
-            } else { // 'after'
-                // This logic is also flawed. Let's simplify.
-                // Let's find index in all columns and place it relative to that.
-                const allColsRefIndex = allColumns.indexOf(referenceColumn);
-                insertIndex = allColsRefIndex - defaultCols.length + 1;
-            }
-          } else {
-             const refIndex = currentCustomColumns.findIndex(c => c.name === referenceColumn);
-             insertIndex = newColumnPosition === 'before' ? refIndex : refIndex + 1;
-          }
-           if(insertIndex < 0) insertIndex = 0;
-
-      }
-
-
-      const newCustomColumns = [...currentCustomColumns];
-      newCustomColumns.splice(insertIndex, 0, newColumn);
-      setValue('customColumns', newCustomColumns);
-
-      const currentItems = getValues('items');
-      const updatedItems = currentItems.map(item => {
-          const newCustomFields = [...(item.customFields || [])];
-          newCustomFields.splice(insertIndex, 0, { name: newColumnName, value: '' });
-          return { ...item, customFields: newCustomFields };
-      });
-      setValue('items', updatedItems);
-
-      setNewColumnName('');
-      setReferenceColumn('');
-      setNewColumnPosition('after');
-      setNewColumnType('text');
-      setIsColumnDialogOpen(false);
-    }
+    setNewColumnName('');
+    setReferenceColumn('');
+    setNewColumnPosition('after');
+    setNewColumnType('text');
+    setIsColumnDialogOpen(false);
   };
 
   const handleRemoveColumn = (columnNameToRemove: string) => {
@@ -278,7 +352,13 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
   const onSubmit = async (values: InvoiceFormData) => {
     try {
         const subtotalVal = calculateSubtotal(values);
-        const totalAmount = subtotalVal - (values.discount || 0);
+        const discountAmount = values.discountType === 'percent'
+          ? (subtotalVal * (values.discount || 0)) / 100
+          : (values.discount || 0);
+        const taxAmount = values.taxType === 'percent'
+          ? (subtotalVal * (values.tax || 0)) / 100
+          : (values.tax || 0);
+        const totalAmount = subtotalVal + taxAmount - discountAmount;
 
         const invoiceData = {
             ...values,
@@ -308,6 +388,12 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
     }
   };
 
+  useEffect(() => {
+    if (mountedRef.current) return;
+    mountedRef.current = true;
+    reset(buildDefaultInvoice());
+  }, [reset]);
+
   if (isInvoiceLoading && invoiceId) {
     return (
         <div className="space-y-8">
@@ -321,6 +407,15 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
     return <p>Invoice not found.</p>;
   }
 
+  if (!mountedRef.current) {
+    return (
+      <div className="space-y-8">
+        <Skeleton className="h-[600px] w-full" />
+        <Skeleton className="h-[70vh] w-full" />
+      </div>
+    );
+  }
+
   return (
     <FormProvider {...methods}>
         <div className="space-y-8">
@@ -331,7 +426,7 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
                 <Form {...methods}>
                     <form onSubmit={handleSubmit(onSubmit)}>
                     <CardContent className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <FormField
                             control={control}
                             name="clientId"
@@ -385,6 +480,31 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
                                    <FormDescription>
                                     3-letter currency code (e.g., USD, BDT).
                                   </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={control}
+                              name="status"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Status</FormLabel>
+                                  <Select
+                                    value={field.value}
+                                    onValueChange={field.onChange}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select status" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="Draft">Draft</SelectItem>
+                                      <SelectItem value="Quotation">Quotation</SelectItem>
+                                      <SelectItem value="Final">Final</SelectItem>
+                                    </SelectContent>
+                                  </Select>
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -471,97 +591,194 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
 
                         <div>
                         <FormLabel>Items</FormLabel>
-                        <div className="overflow-x-auto">
-                            <table className="w-full mt-2">
-                                <thead>
-                                    <tr>
-                                        <th className="px-2 py-2 text-left w-1/3">Description</th>
-                                        <th className="px-2 py-2 text-left">
-                                            <div className="flex items-center gap-1">
-                                                Qty
-                                                <Button
+                        <div className="overflow-hidden rounded-2xl border border-border/60 bg-white shadow-md">
+                            <table className="w-full mt-2 text-sm">
+                                <thead className="bg-gradient-to-r from-primary/15 via-primary/10 to-primary/15 text-slate-800">
+                                    <tr className="text-xs font-semibold tracking-wide">
+                                        {orderedColumns.map((colName) => {
+                                          if (colName === 'Description') {
+                                            return (
+                                              <th key={colName} className="px-4 py-3 text-left w-1/3">
+                                                <div className="flex items-center gap-2">
+                                                  {columnLabels.Description}
+                                                  <Button
                                                     type="button"
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="h-5 w-5"
-                                                    onClick={() => setShowQtyInPreview(!showQtyInPreview)}
-                                                >
-                                                    {showQtyInPreview ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                                                </Button>
-                                            </div>
-                                        </th>
-                                        <th className="px-2 py-2 text-left">Price</th>
-                                        {customColumns.map(col => (
-                                            <th key={col.name} className="px-2 py-2 text-left">
-                                                <div className="flex items-center gap-1">
-                                                    {col.name}
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-5 w-5 text-destructive/70 hover:text-destructive"
-                                                        onClick={() => handleRemoveColumn(col.name)}
-                                                    >
-                                                        <X className="h-4 w-4" />
-                                                    </Button>
+                                                    className="h-6 w-6 text-slate-500 hover:text-primary"
+                                                    onClick={() => handleEditLabel('Description')}
+                                                  >
+                                                    <Pencil className="h-4 w-4" />
+                                                  </Button>
                                                 </div>
+                                              </th>
+                                            );
+                                          }
+                                          if (colName === 'Qty') {
+                                            return (
+                                              <th key={colName} className="px-4 py-3 text-left">
+                                                <div className="flex items-center gap-1">
+                                                  {columnLabels.Qty}
+                                                  <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-5 w-5 text-slate-500 hover:text-primary"
+                                                    onClick={() => setShowQtyInPreview(!showQtyInPreview)}
+                                                  >
+                                                    {showQtyInPreview ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                                                  </Button>
+                                                  <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 text-slate-500 hover:text-primary"
+                                                    onClick={() => handleEditLabel('Qty')}
+                                                  >
+                                                    <Pencil className="h-4 w-4" />
+                                                  </Button>
+                                                </div>
+                                              </th>
+                                            );
+                                          }
+                                          if (colName === 'Price') {
+                                            return (
+                                              <th key={colName} className="px-4 py-3 text-left">
+                                                <div className="flex items-center gap-2">
+                                                  {columnLabels.Price}
+                                                  <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 text-slate-500 hover:text-primary"
+                                                    onClick={() => handleEditLabel('Price')}
+                                                  >
+                                                    <Pencil className="h-4 w-4" />
+                                                  </Button>
+                                                </div>
+                                              </th>
+                                            );
+                                          }
+                                          return (
+                                            <th key={colName} className="px-4 py-3 text-left">
+                                              <div className="flex items-center gap-1">
+                                                {colName}
+                                                <Button
+                                                  type="button"
+                                                  variant="ghost"
+                                                  size="icon"
+                                                  className="h-5 w-5 text-slate-500 hover:text-destructive"
+                                                  onClick={() => handleRemoveColumn(colName)}
+                                                >
+                                                  <X className="h-4 w-4" />
+                                                </Button>
+                                              </div>
                                             </th>
-                                        ))}
-                                        <th className="px-2 py-2 text-right">Total</th>
-                                        <th className="px-2 py-2 text-right">Actions</th>
+                                          );
+                                        })}
+                                        <th className="px-4 py-3 text-right">Total</th>
+                                        <th className="px-4 py-3 text-right">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody className="divide-y divide-border/60">
                                 {fields.map((field, index) => {
                                   const item = watchedItems[index];
                                   return (
-                                    <tr key={field.id} className="items-start">
-                                        <td>
-                                        <FormField
-                                            control={control}
-                                            name={`items.${index}.description`}
-                                            render={({ field }) => ( <FormItem><FormControl><Input placeholder="Item description" {...field} /></FormControl><FormMessage /></FormItem> )}
-                                        />
-                                        </td>
-                                        <td>
-                                        <FormField
-                                            control={control}
-                                            name={`items.${index}.quantity`}
-                                            render={({ field }) => ( <FormItem><FormControl><Input type="number" placeholder="Qty" {...field} /></FormControl><FormMessage /></FormItem> )}
-                                        />
-                                        </td>
-                                        <td>
-                                        <FormField
-                                            control={control}
-                                            name={`items.${index}.unitPrice`}
-                                            render={({ field }) => ( <FormItem><FormControl><Input type="number" placeholder="Price" {...field} /></FormControl><FormMessage /></FormItem> )}
-                                        />
-                                        </td>
-                                        {customColumns.map((col, colIndex) => {
-                                          const customFieldIndex = (item.customFields || []).findIndex(cf => cf.name === col.name);
-                                          const fieldName = `items.${index}.customFields.${customFieldIndex}.value`
-                                          const nameFieldName = `items.${index}.customFields.${customFieldIndex}.name`
-
-                                          return (
-                                            <td key={col.name}>
-                                                <input type="hidden" {...methods.register(nameFieldName as any)} value={col.name} />
-                                                <Input
-                                                    placeholder={col.name}
-                                                    type={col.type === 'text' ? 'text' : 'number'}
-                                                    {...methods.register(fieldName as any)}
+                                    <tr key={field.id} className="items-start odd:bg-white even:bg-slate-50 transition-colors hover:bg-primary/5 last:border-b-0">
+                                        {orderedColumns.map((colName) => {
+                                          if (colName === 'Description') {
+                                            return (
+                                              <td key={`${field.id}-desc`} className="px-4 py-3 align-top">
+                                                <FormField
+                                                  control={control}
+                                                  name={`items.${index}.description`}
+                                                  render={({ field }) => (
+                                                    <FormItem>
+                                                      <FormControl>
+                                                        <Input
+                                                          placeholder="Item description"
+                                                          {...field}
+                                                          className="rounded-lg bg-white focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:border-primary/70"
+                                                        />
+                                                      </FormControl>
+                                                      <FormMessage />
+                                                    </FormItem>
+                                                  )}
                                                 />
+                                              </td>
+                                            );
+                                          }
+                                          if (colName === 'Qty') {
+                                            return (
+                                              <td key={`${field.id}-qty`} className="px-4 py-3 align-top">
+                                                <FormField
+                                                  control={control}
+                                                  name={`items.${index}.quantity`}
+                                                  render={({ field }) => (
+                                                    <FormItem>
+                                                      <FormControl>
+                                                        <Input
+                                                          type="number"
+                                                          placeholder="Qty"
+                                                          {...field}
+                                                          className="rounded-lg bg-white text-right focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:border-primary/70"
+                                                        />
+                                                      </FormControl>
+                                                      <FormMessage />
+                                                    </FormItem>
+                                                  )}
+                                                />
+                                              </td>
+                                            );
+                                          }
+                                          if (colName === 'Price') {
+                                            return (
+                                              <td key={`${field.id}-price`} className="px-4 py-3 align-top">
+                                                <FormField
+                                                  control={control}
+                                                  name={`items.${index}.unitPrice`}
+                                                  render={({ field }) => (
+                                                    <FormItem>
+                                                      <FormControl>
+                                                        <Input
+                                                          type="number"
+                                                          placeholder="Price"
+                                                          {...field}
+                                                          className="rounded-lg bg-white text-right focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:border-primary/70"
+                                                        />
+                                                      </FormControl>
+                                                      <FormMessage />
+                                                    </FormItem>
+                                                  )}
+                                                />
+                                              </td>
+                                            );
+                                          }
+                                          const colMeta = customColumns.find(c => c.name === colName);
+                                          const customFieldIndex = (item.customFields || []).findIndex(cf => cf.name === colName);
+                                          const fieldName = `items.${index}.customFields.${customFieldIndex}.value`;
+                                          const nameFieldName = `items.${index}.customFields.${customFieldIndex}.name`;
+                                          return (
+                                            <td key={`${field.id}-${colName}`} className="px-4 py-3 align-top">
+                                              <input type="hidden" {...methods.register(nameFieldName as any)} value={colName} />
+                                              <Input
+                                                placeholder={colName}
+                                                type={colMeta?.type === 'text' ? 'text' : 'number'}
+                                                {...methods.register(fieldName as any)}
+                                                className="rounded-lg bg-white focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:border-primary/70"
+                                              />
                                             </td>
-                                          )
+                                          );
                                         })}
-                                        <td className="text-right py-2 font-medium align-top">
+                                        <td className="text-right px-4 py-3 font-semibold align-top text-foreground">
                                             {formatCurrency(calculateLineItemTotal(item), currency)}
                                         </td>
-                                        <td className='align-top'>
+                                        <td className='align-top px-4 py-3 text-right'>
                                         <Button
                                             type="button"
                                             variant="ghost"
                                             size="icon"
-                                            className="text-destructive hover:text-destructive"
+                                            className="text-destructive hover:text-destructive bg-destructive/10 hover:bg-destructive/20"
                                             onClick={() => remove(index)}
                                         >
                                             <Trash2 className="h-4 w-4" />
@@ -683,10 +900,118 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
                                   name="discount"
                                   render={({ field }) => (
                                     <FormItem className="grid grid-cols-2 items-center gap-4">
-                                      <FormLabel className="text-right">Discount</FormLabel>
-                                      <FormControl>
-                                        <Input type="number" placeholder="0.00" {...field} className="text-right" />
-                                      </FormControl>
+                                      <div className="flex items-center justify-end gap-2">
+                                        <span className="text-right">{discountLabel}</span>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6 text-muted-foreground hover:text-primary"
+                                          onClick={() => setShowDiscountLine((prev) => !prev)}
+                                        >
+                                          {showDiscountLine ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6 text-muted-foreground hover:text-primary"
+                                          onClick={handleEditDiscountLabel}
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                      {showDiscountLine ? (
+                                        <div className="flex flex-col items-end gap-1">
+                                          <div className="flex items-center justify-end gap-2 w-full">
+                                            <FormControl className="w-full">
+                                              <Input type="number" placeholder="0.00" {...field} className="text-right" />
+                                            </FormControl>
+                                            <Select
+                                              value={discountType}
+                                            onValueChange={(val) => setValue('discountType', val as 'fixed' | 'percent')}
+                                          >
+                                            <SelectTrigger className="w-28">
+                                              <SelectValue placeholder="Type" />
+                                            </SelectTrigger>
+                                              <SelectContent>
+                                                <SelectItem value="fixed">Fixed</SelectItem>
+                                                <SelectItem value="percent">%</SelectItem>
+                                              </SelectContent>
+                                            </Select>
+                                          </div>
+                                          <span className="text-xs text-muted-foreground">
+                                            {discountType === 'percent'
+                                              ? `-${formatCurrency(discountAmount, currency)} (${discount || 0}%)`
+                                              : `-${formatCurrency(discountAmount, currency)}`}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <div className="text-right text-sm text-muted-foreground">Hidden</div>
+                                      )}
+                                      <FormMessage className="col-span-2" />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={control}
+                                  name="tax"
+                                  render={({ field }) => (
+                                    <FormItem className="grid grid-cols-2 items-center gap-4">
+                                      <div className="flex items-center justify-end gap-2">
+                                        <span className="text-right">{taxLabel}</span>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6 text-muted-foreground hover:text-primary"
+                                          onClick={() => setShowTaxLine((prev) => !prev)}
+                                        >
+                                          {showTaxLine ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6 text-muted-foreground hover:text-primary"
+                                          onClick={handleEditTaxLabel}
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                      {showTaxLine ? (
+                                        <div className="flex flex-col items-end gap-1">
+                                          <div className="flex items-center justify-end gap-2 w-full">
+                                            <FormControl className="w-full">
+                                              <Input
+                                                type="number"
+                                                placeholder="0.00"
+                                                {...field}
+                                                className="text-right"
+                                              />
+                                            </FormControl>
+                                            <Select
+                                              value={taxType}
+                                              onValueChange={(val) => setValue('taxType', val as 'fixed' | 'percent')}
+                                            >
+                                            <SelectTrigger className="w-28">
+                                              <SelectValue placeholder="Type" />
+                                            </SelectTrigger>
+                                              <SelectContent>
+                                                <SelectItem value="fixed">Fixed</SelectItem>
+                                                <SelectItem value="percent">%</SelectItem>
+                                              </SelectContent>
+                                            </Select>
+                                          </div>
+                                          <span className="text-xs text-muted-foreground">
+                                            {taxType === 'percent'
+                                              ? `${formatCurrency(taxAmount, currency)} (${tax || 0}%)`
+                                              : formatCurrency(taxAmount, currency)}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <div className="text-right text-sm text-muted-foreground">Hidden</div>
+                                      )}
                                       <FormMessage className="col-span-2" />
                                     </FormItem>
                                   )}
@@ -737,11 +1062,26 @@ export default function InvoiceForm({ params }: InvoiceFormProps) {
                     </form>
                 </Form>
             </Card>
-            <InvoicePreview generatedHtml={generatedHtml} companyProfile={companyProfile} showQty={showQtyInPreview} />
+            <InvoicePreview
+              generatedHtml={generatedHtml}
+              companyProfile={companyProfile}
+              showQty={showQtyInPreview}
+              orderedColumns={orderedColumns}
+              columnLabels={columnLabels}
+              showDiscountLine={showDiscountLine}
+              discountLabel={discountLabel}
+              showTaxLine={showTaxLine}
+              taxLabel={taxLabel}
+            />
         </div>
         <ClientForm 
             isOpen={isClientFormOpen}
             onClose={() => setIsClientFormOpen(false)}
+            onSaved={() => setClientsVersion(v => v + 1)}
+            onSavedId={(id) => {
+              setClientsVersion(v => v + 1);
+              selectClientById(id);
+            }}
             client={null}
         />
     </FormProvider>

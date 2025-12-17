@@ -1,37 +1,26 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useCollection, useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, limit } from 'firebase/firestore';
+import { useCollection } from '@/firebase';
+import { useUser } from '@/auth';
 import { type InvoiceWithId } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { DollarSign, TrendingUp, CircleDollarSign, FileText } from 'lucide-react';
+import { DollarSign, TrendingUp, CircleDollarSign } from 'lucide-react';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts"
 import { format } from 'date-fns';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
 export default function DashboardPage() {
-  const firestore = useFirestore();
   const { user } = useUser();
-
-  const invoicesCollection = useMemoFirebase(
-    () => (user && firestore ? collection(firestore, 'users', user.uid, 'invoices') : null),
-    [user, firestore]
-  );
-  
-  const allInvoicesQuery = useMemoFirebase(
-      () => (invoicesCollection ? query(invoicesCollection, orderBy('issueDate', 'desc')) : null),
-      [invoicesCollection]
-  );
 
   const {
     data: invoices,
     isLoading,
     error,
-  } = useCollection<InvoiceWithId>(allInvoicesQuery);
+  } = useCollection<InvoiceWithId>(user ? '/api/invoices' : null);
 
   const calculateSubtotal = (invoice: InvoiceWithId) => {
     return invoice.items.reduce((acc, item) => {

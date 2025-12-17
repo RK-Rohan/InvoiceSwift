@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useCollection, useUser, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, query, orderBy, doc } from 'firebase/firestore';
+import { useState } from 'react';
+import { useCollection, useDoc } from '@/firebase';
+import { useUser } from '@/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -25,30 +25,15 @@ export default function InvoicesPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceWithId | null>(null);
   const { toast } = useToast();
 
-  const firestore = useFirestore();
   const { user } = useUser();
-
-  const invoicesCollection = useMemoFirebase(
-    () => (user && firestore ? collection(firestore, 'users', user.uid, 'invoices') : null),
-    [user, firestore]
-  );
-  
-  const invoicesQuery = useMemoFirebase(
-      () => (invoicesCollection ? query(invoicesCollection, orderBy('issueDate', 'desc')) : null),
-      [invoicesCollection]
-  );
 
   const {
     data: invoices,
     isLoading,
     error,
-  } = useCollection<InvoiceWithId>(invoicesQuery);
+  } = useCollection<InvoiceWithId>(user ? '/api/invoices' : null);
 
-  const companyProfileRef = useMemoFirebase(
-    () => (user && firestore ? doc(firestore, 'users', user.uid, 'companyProfile', 'profile') : null),
-    [user, firestore]
-  );
-  const { data: companyProfile } = useDoc<CompanyProfile>(companyProfileRef);
+  const { data: companyProfile } = useDoc<CompanyProfile>(user ? '/api/company-profile' : null);
 
   const handleAction = (invoice: InvoiceWithId, action: 'edit' | 'delete' | 'payment' | 'duplicate') => {
     setSelectedInvoice(invoice);

@@ -14,7 +14,6 @@ import { Label } from '@/components/ui/label';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useAuth } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import {
   Form,
@@ -23,8 +22,8 @@ import {
   FormItem,
   FormMessage,
 } from '@/components/ui/form';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
+import { signIn } from 'next-auth/react';
 
 const signupSchema = z.object({
   email: z.string().email(),
@@ -34,7 +33,6 @@ const signupSchema = z.object({
 type SignupValues = z.infer<typeof signupSchema>;
 
 export default function SignupForm() {
-  const auth = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const form = useForm<SignupValues>({
@@ -46,10 +44,25 @@ export default function SignupForm() {
   });
 
   const onSubmit = async (values: SignupValues) => {
-    if (!auth) return;
     try {
-      await createUserWithEmailAndPassword(auth, values.email, values.password);
-      router.push('/invoices');
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to create account.');
+      }
+
+      await signIn('credentials', {
+        email: values.email,
+        password: values.password,
+        redirect: false,
+      });
+
+      router.push('/dashboard');
     } catch (error: any) {
       toast({
         variant: 'destructive',

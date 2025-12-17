@@ -1,9 +1,8 @@
 
 'use client';
 
-import { useMemo, useEffect, useState } from 'react';
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { useEffect, useState } from 'react';
+import { useUser } from '@/auth';
 import type { InvoiceWithId, CompanyProfile } from '@/lib/types';
 import { useForm, FormProvider } from 'react-hook-form';
 import InvoicePreview from '@/components/invoice/invoice-preview';
@@ -13,30 +12,32 @@ export default function ViewInvoicePage({ params }: { params: { id: string } }) 
   const [invoice, setInvoice] = useState<InvoiceWithId | null>(null);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const firestore = useFirestore();
   const { user } = useUser();
   const methods = useForm<InvoiceWithId>();
   
   useEffect(() => {
-    if (!user || !firestore || !params.id) return;
+    if (!user || !params.id) return;
     
     const fetchInvoiceAndProfile = async () => {
       setLoading(true);
       try {
-        const invoiceRef = doc(firestore, 'users', user.uid, 'invoices', params.id);
-        const invoiceSnap = await getDoc(invoiceRef);
-        
-        if (invoiceSnap.exists()) {
-          const invoiceData = { ...invoiceSnap.data(), id: invoiceSnap.id } as InvoiceWithId;
-          setInvoice(invoiceData);
-          methods.reset(invoiceData);
+        const [invoiceRes, profileRes] = await Promise.all([
+          fetch(`/api/invoices/${params.id}`),
+          fetch('/api/company-profile'),
+        ]);
+
+        if (invoiceRes.ok) {
+          const invoiceBody = await invoiceRes.json();
+          const invoiceData = invoiceBody.data as InvoiceWithId | null;
+          if (invoiceData) {
+            setInvoice(invoiceData);
+            methods.reset(invoiceData);
+          }
         }
 
-        const companyProfileRef = doc(firestore, 'users', user.uid, 'companyProfile', 'profile');
-        const companyProfileSnap = await getDoc(companyProfileRef);
-
-        if (companyProfileSnap.exists()) {
-          setCompanyProfile(companyProfileSnap.data() as CompanyProfile);
+        if (profileRes.ok) {
+          const profileBody = await profileRes.json();
+          setCompanyProfile(profileBody.data as CompanyProfile | null);
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -46,7 +47,7 @@ export default function ViewInvoicePage({ params }: { params: { id: string } }) 
     };
 
     fetchInvoiceAndProfile();
-  }, [user, firestore, params.id, methods]);
+  }, [user, params.id, methods]);
   
   useEffect(() => {
     if (!loading && invoice) {

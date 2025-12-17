@@ -1,5 +1,5 @@
 'use client';
-import { useUser } from '@/firebase';
+import { useUser } from '@/auth';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { SidebarProvider } from '@/components/ui/sidebar';
@@ -26,24 +26,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
-        <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
-          <div className="hidden border-r bg-muted/40 md:block">
-            <div className="flex h-full max-h-screen flex-col gap-2">
-              <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
-                <span className="text-xl font-bold tracking-tight">InvoiceSwift</span>
-              </div>
-              <div className="flex-1">
-                <SidebarNav />
-              </div>
+      <div className="grid min-h-screen w-full md:grid-cols-[180px_1fr] lg:grid-cols-[220px_1fr] bg-gradient-to-br from-slate-50 via-white to-slate-100">
+        <div className="hidden border-r bg-white/80 backdrop-blur md:block">
+          <div className="flex h-full max-h-screen flex-col gap-2">
+            <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-5">
+              <span className="text-lg font-bold tracking-tight">InvoiceSwift</span>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <SidebarNav />
             </div>
           </div>
-          <div className="flex flex-col">
-            <Header />
-            <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40">
-              {children}
-            </main>
-          </div>
         </div>
+        <div className="flex flex-col">
+          <Header />
+          <main className="flex flex-1 flex-col items-center px-4 py-4 lg:px-8 lg:py-6 bg-gradient-to-b from-white/80 to-slate-50">
+            <div className="w-full max-w-6xl p-0">
+              {children}
+            </div>
+          </main>
+        </div>
+      </div>
     </SidebarProvider>
   );
 }

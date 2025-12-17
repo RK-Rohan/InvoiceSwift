@@ -14,7 +14,6 @@ import { Label } from '@/components/ui/label';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useAuth } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import {
   Form,
@@ -23,8 +22,8 @@ import {
   FormItem,
   FormMessage,
 } from '@/components/ui/form';
-import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
+import { signIn } from 'next-auth/react';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -34,7 +33,6 @@ const loginSchema = z.object({
 type LoginValues = z.infer<typeof loginSchema>;
 
 export default function LoginForm() {
-  const auth = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const form = useForm<LoginValues>({
@@ -46,10 +44,18 @@ export default function LoginForm() {
   });
 
   const onSubmit = async (values: LoginValues) => {
-    if (!auth) return;
     try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
-      router.push('/invoices');
+      const result = await signIn('credentials', {
+        email: values.email,
+        password: values.password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        throw new Error(result.error);
+      }
+
+      router.push('/dashboard');
     } catch (error: any) {
       toast({
         variant: 'destructive',

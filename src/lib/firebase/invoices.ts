@@ -1,127 +1,42 @@
 
 'use client';
 
-import {
-  collection,
-  doc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  serverTimestamp,
-  writeBatch,
-} from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
-import {
-  initializeFirebase,
-  errorEmitter,
-  FirestorePermissionError,
-  deleteDocumentNonBlocking,
-  updateDocumentNonBlocking,
-} from '@/firebase';
-import type { Invoice, InvoiceFormData, InvoiceWithId } from '@/lib/types';
-import { format } from 'date-fns';
+import type { InvoiceFormData, InvoiceWithId } from '@/lib/types';
 
-const { firestore, auth } = initializeFirebase();
-
-function getInvoicesCollection() {
-  const user = auth.currentUser;
-  if (!user) throw new Error('User not authenticated');
-  return collection(firestore, 'users', user.uid, 'invoices');
+async function handleResponse(res: Response) {
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body?.error || 'Request failed');
+  }
+  return body;
 }
 
-const calculateSubtotal = (invoiceData: Partial<InvoiceFormData>): number => {
-  if (!invoiceData.items) return 0;
-  return invoiceData.items.reduce((acc, item) => {
-    let itemTotal = (item.quantity || 0) * (item.unitPrice || 0);
-    if (item.customFields && invoiceData.customColumns) {
-      item.customFields.forEach(field => {
-        const column = invoiceData.customColumns?.find(c => c.name === field.name);
-        const value = parseFloat(field.value) || 0;
-        if (column?.type === 'subtractive') {
-          itemTotal -= value;
-        } else if (column?.type === 'additive') {
-          itemTotal += value;
-        }
-      });
-    }
-    return acc + itemTotal;
-  }, 0);
-};
-
-export function addInvoice(invoiceData: InvoiceFormData) {
-  const invoicesCollection = getInvoicesCollection();
-  
-  const subtotal = calculateSubtotal(invoiceData);
-  const totalAmount = subtotal - (invoiceData.discount || 0);
-
-  const data = {
-    ...invoiceData,
-    issueDate: format(new Date(invoiceData.issueDate), 'yyyy-MM-dd'),
-    dueDate: format(new Date(invoiceData.dueDate), 'yyyy-MM-dd'),
-    currency: invoiceData.currency || 'USD',
-    totalAmount: totalAmount,
-    createdAt: serverTimestamp(),
-    customColumns: invoiceData.customColumns || [],
-    items: (invoiceData.items || []).map(item => ({
-      ...item,
-      customFields: item.customFields || [],
-    })),
-  };
-
-  return addDoc(invoicesCollection, data).catch(error => {
-    const permissionError = new FirestorePermissionError({
-      path: invoicesCollection.path,
-      operation: 'create',
-      requestResourceData: data,
-    });
-    errorEmitter.emit('permission-error', permissionError);
-    throw error;
+export async function addInvoice(invoiceData: InvoiceFormData) {
+  const res = await fetch('/api/invoices', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(invoiceData),
   });
+  const body = await handleResponse(res);
+  return body.data as InvoiceWithId;
 }
 
-export function updateInvoice(invoiceId: string, invoiceData: Partial<InvoiceFormData>) {
-  const invoiceDoc = doc(getInvoicesCollection(), invoiceId);
-
-  // Start with the provided data and add the update timestamp
-  const dataToUpdate: Partial<Invoice & { updatedAt: any }> = {
-    ...invoiceData,
-    updatedAt: serverTimestamp(),
-  };
-
-  // Convert dates to string format if they exist in the payload
-  if (invoiceData.issueDate && typeof invoiceData.issueDate !== 'string') {
-    dataToUpdate.issueDate = format(new Date(invoiceData.issueDate), 'yyyy-MM-dd');
-  }
-  if (invoiceData.dueDate && typeof invoiceData.dueDate !== 'string') {
-    dataToUpdate.dueDate = format(new Date(invoiceData.dueDate), 'yyyy-MM-dd');
-  }
-
-  // If items, customColumns, or discount are being updated, we must recalculate the totalAmount
-  if (invoiceData.items || invoiceData.customColumns || invoiceData.discount !== undefined) {
-      const subtotal = calculateSubtotal(invoiceData);
-      dataToUpdate.totalAmount = subtotal - (invoiceData.discount || 0);
-  }
-
-  updateDocumentNonBlocking(invoiceDoc, dataToUpdate);
+export async function updateInvoice(invoiceId: string, invoiceData: Partial<InvoiceFormData>) {
+  const res = await fetch(`/api/invoices/${invoiceId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(invoiceData),
+  });
+  await handleResponse(res);
 }
 
-export function deleteInvoice(invoiceId: string) {
-  const invoiceDoc = doc(getInvoicesCollection(), invoiceId);
-  deleteDocumentNonBlocking(invoiceDoc);
+export async function deleteInvoice(invoiceId: string) {
+  const res = await fetch(`/api/invoices/${invoiceId}`, { method: 'DELETE' });
+  await handleResponse(res);
 }
 
-export async function duplicateInvoice(originalInvoice: InvoiceWithId) {
-  // Omit 'id' and other fields that should not be copied directly.
-  const { id, totalAmount, ...copiedData } = originalInvoice;
-
-  const newInvoiceData: InvoiceFormData = {
-    ...copiedData,
-    invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
-    issueDate: new Date(),
-    dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
-    totalPaid: 0, // Reset payment status for the new invoice
-    createdAt: serverTimestamp(),
-  };
-
-  return addInvoice(newInvoiceData);
+export async function duplicateInvoice(invoice: InvoiceWithId) {
+  const res = await fetch(`/api/invoices/${invoice.id}/duplicate`, { method: 'POST' });
+  const body = await handleResponse(res);
+  return body.data as InvoiceWithId;
 }

@@ -27,6 +27,8 @@ const dateOrStringSchema = z.union([z.date(), z.string()]).transform((val) => {
 const customColumnSchema = z.object({
   name: z.string(),
   type: z.enum(['text', 'subtractive', 'additive']),
+  position: z.enum(['before', 'after']).optional(),
+  anchor: z.string().optional(),
 });
 
 const customFieldSchema = z.object({
@@ -43,6 +45,7 @@ export const invoiceFormSchema = z.object({
   invoiceNumber: z.string().min(1, 'Invoice number is required.'),
   issueDate: dateOrStringSchema,
   dueDate: dateOrStringSchema,
+  status: z.enum(['Final', 'Quotation', 'Draft']).default('Final'),
   currency: z.string().optional().default('BDT'),
   items: z.array(z.object({
     description: z.string().min(1, 'Item description is required.'),
@@ -53,6 +56,9 @@ export const invoiceFormSchema = z.object({
   notes: z.string().optional(),
   customColumns: z.array(customColumnSchema).optional(),
   discount: z.coerce.number().optional(),
+  discountType: z.enum(['fixed', 'percent']).optional().default('fixed'),
+  tax: z.coerce.number().optional(),
+  taxType: z.enum(['fixed', 'percent']).optional().default('fixed'),
   totalPaid: z.coerce.number().optional(),
   createdAt: z.any().optional(), // Allow serverTimestamp
 });

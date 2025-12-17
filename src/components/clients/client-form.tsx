@@ -30,9 +30,11 @@ type ClientFormProps = {
   isOpen: boolean;
   onClose: () => void;
   client: Client | null;
+  onSaved?: () => void;
+  onSavedId?: (id: string) => void;
 };
 
-export default function ClientForm({ isOpen, onClose, client }: ClientFormProps) {
+export default function ClientForm({ isOpen, onClose, client, onSaved, onSavedId }: ClientFormProps) {
   const { toast } = useToast();
   const form = useForm<ClientFormData>({
     resolver: zodResolver(clientFormSchema),
@@ -63,9 +65,11 @@ export default function ClientForm({ isOpen, onClose, client }: ClientFormProps)
         await updateClient(client.id, values);
         toast({ title: 'Client updated successfully' });
       } else {
-        await addClient(values);
+        const created = await addClient(values);
+        onSavedId?.(created?.id);
         toast({ title: 'Client added successfully' });
       }
+      onSaved?.();
       onClose();
     } catch (error: any) {
       // The FirestorePermissionError is thrown by our logic in `addClient`

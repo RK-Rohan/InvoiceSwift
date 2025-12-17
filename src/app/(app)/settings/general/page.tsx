@@ -24,26 +24,20 @@ import {
   FormDescription,
 } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { useUser, useFirestore, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { useUser } from '@/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User as UserIcon } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { type CompanyProfile, companyProfileSchema } from '@/lib/types';
+import { useDoc } from '@/firebase';
 
 type CompanyProfileFormData = z.infer<typeof companyProfileSchema>;
 
 export default function GeneralSettingsPage() {
   const { toast } = useToast();
   const { user } = useUser();
-  const firestore = useFirestore();
 
-  const companyProfileRef = useMemoFirebase(
-    () => (user && firestore ? doc(firestore, 'users', user.uid, 'companyProfile', 'profile') : null),
-    [user, firestore]
-  );
-
-  const { data: companyProfile, isLoading } = useDoc<CompanyProfile>(companyProfileRef);
+  const { data: companyProfile, isLoading } = useDoc<CompanyProfile>(user ? '/api/company-profile' : null);
 
   const form = useForm<CompanyProfileFormData>({
     resolver: zodResolver(companyProfileSchema),
@@ -76,30 +70,26 @@ export default function GeneralSettingsPage() {
   };
 
   const onSubmit = async (values: CompanyProfileFormData) => {
-    if (!companyProfileRef) return;
-    const dataToSave = { ...values, updatedAt: serverTimestamp() };
-    
-    setDoc(companyProfileRef, dataToSave, { merge: true })
-    .then(() => {
-        toast({ title: 'Settings saved successfully!' });
-    })
-    .catch((error: any) => {
-      if (error.code === 'permission-denied') {
-          const permissionError = new FirestorePermissionError({
-            path: companyProfileRef.path,
-            operation: 'write',
-            requestResourceData: dataToSave,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      } else {
-        console.error(error);
-        toast({
-          variant: 'destructive',
-          title: 'Uh oh! Something went wrong.',
-          description: error.message || 'Could not save settings.',
-        });
+    if (!user) return;
+    try {
+      const res = await fetch('/api/company-profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error || 'Could not save settings.');
       }
-    });
+      toast({ title: 'Settings saved successfully!' });
+    } catch (error: any) {
+      console.error(error);
+      toast({
+        variant: 'destructive',
+        title: 'Uh oh! Something went wrong.',
+        description: error.message || 'Could not save settings.',
+      });
+    }
   };
 
   if (isLoading) {

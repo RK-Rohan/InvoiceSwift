@@ -1,23 +1,20 @@
 'use client';
 import { LogOut } from 'lucide-react';
 import { Button } from './ui/button';
-import { useAuth } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { signOut } from 'next-auth/react';
 
 export default function Header() {
-  const auth = useAuth();
   const router = useRouter();
   const { isMobile } = useSidebar();
 
   const handleSignOut = async () => {
-    if (auth) {
-      await auth.signOut();
-      router.push('/login');
-    }
+    await signOut({ redirect: false });
+    router.push('/login');
   };
 
   return (

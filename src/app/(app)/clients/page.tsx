@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { useCollection, useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useState } from 'react';
+import { useCollection } from '@/firebase';
+import { useUser } from '@/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PlusCircle, Edit, Trash2 } from 'lucide-react';
@@ -16,19 +16,13 @@ export default function ClientsPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
 
-  const firestore = useFirestore();
   const { user } = useUser();
-
-  const clientsCollection = useMemoFirebase(
-    () => (user && firestore ? collection(firestore, 'users', user.uid, 'clients') : null),
-    [user, firestore]
-  );
 
   const {
     data: clients,
     isLoading,
     error,
-  } = useCollection<Omit<Client, 'id'>>(clientsCollection);
+  } = useCollection<Omit<Client, 'id'>>(user ? '/api/clients' : null);
 
   const handleAddClient = () => {
     setSelectedClient(null);
